@@ -762,7 +762,8 @@ window.addEventListener('load',()=>{
 // ── API ───────────────────────────────────────────────────────────────────────
 async function apiFetch(params){const res=await fetch(API+'?'+new URLSearchParams(params));return res.json();}
 async function apiPost(body){
-  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({...body,_userEmail:S.currentUser?.email||''})});
+  const payload=encodeURIComponent(JSON.stringify({...body,_userEmail:S.currentUser?.email||''}));
+  const res=await fetch(API+'?payload='+payload);
   return res.json();
 }
 
