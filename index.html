@@ -768,16 +768,20 @@ async function fetchLiveRates(){
   try{
     const res=await fetch('https://small-fog-2330.ramon-osuna.workers.dev/fetch-fx');
     const json=await res.json();
-    if(json.error){toast('Error: '+json.error);return;}
+    console.log('fetchLiveRates response:',JSON.stringify(json));
+    if(json.error){alert('Error: '+json.error);return;}
+    if(!json.rates){alert('No rates in response: '+JSON.stringify(json));return;}
     const r=json.rates;
     $('fxMXN').value=r.MXN;
     $('fxBRL').value=r.BRL;
     $('fxCOP').value=r.COP;
     $('fxCAD').value=r.CAD;
     $('fxEUR').value=r.EUR;
+    console.log('Fields set — MXN:',r.MXN,'BRL:',r.BRL,'COP:',r.COP,'CAD:',r.CAD,'EUR:',r.EUR);
     toast('✓ Live rates fetched — review and save');
   }catch(err){
-    toast('Fetch failed: '+err.message);
+    console.error('fetchLiveRates error:',err);
+    alert('Fetch failed: '+err.message);
   }
 }
 async function apiPost(body){
