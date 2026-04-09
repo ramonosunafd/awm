@@ -310,6 +310,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn btn-primary" onclick="saveFX()">Save Rates to Google Sheet</button>
+      <button class="btn btn-secondary" onclick="fetchLiveRates()">🌐 Fetch current rates</button>
       <button class="btn btn-secondary" id="fx-cancel-edit" style="display:none" onclick="fxCancelEdit()">Cancel edit</button>
       <span id="fx-edit-badge" style="display:none;font-size:12px;color:var(--brand-red);font-weight:600">✎ Editing existing row</span>
     </div>
