@@ -762,6 +762,23 @@ window.addEventListener('load',()=>{
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function apiFetch(params){const res=await fetch(API+'?'+new URLSearchParams(params));return res.json();}
+
+async function fetchLiveRates(){
+  toast('Fetching live rates…');
+  try{
+    const res=await apiFetch({action:'fetchFXRates'});
+    if(res.error){toast('Error: '+res.error);return;}
+    const r=res.rates;
+    $('fxMXN').value=r.MXN;
+    $('fxBRL').value=r.BRL;
+    $('fxCOP').value=r.COP;
+    $('fxCAD').value=r.CAD;
+    $('fxEUR').value=r.EUR;
+    toast('✓ Live rates fetched — review and save');
+  }catch(err){
+    toast('Fetch failed: '+err.message);
+  }
+}
 async function apiPost(body){
   try{
     const json=JSON.stringify({...body,_userEmail:S.currentUser?.email||''});
