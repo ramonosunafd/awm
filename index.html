@@ -766,9 +766,10 @@ async function apiFetch(params){const res=await fetch(API+'?'+new URLSearchParam
 async function fetchLiveRates(){
   toast('Fetching live rates…');
   try{
-    const res=await apiFetch({action:'fetchFXRates'});
-    if(res.error){toast('Error: '+res.error);return;}
-    const r=res.rates;
+    const res=await fetch('https://small-fog-2330.ramon-osuna.workers.dev/fetch-fx');
+    const json=await res.json();
+    if(json.error){toast('Error: '+json.error);return;}
+    const r=json.rates;
     $('fxMXN').value=r.MXN;
     $('fxBRL').value=r.BRL;
     $('fxCOP').value=r.COP;
