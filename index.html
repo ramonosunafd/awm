@@ -968,7 +968,7 @@ const _now=new Date();
 const _curYear=_now.getFullYear();
 const _jan1=new Date(_curYear,0,1);
 const _firstSun=new Date(_curYear,0,1+(_jan1.getDay()===0?0:7-_jan1.getDay()));
-const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000))+1);
+const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000)));
 fillYW($('dy'),$('dw'),_curYear,_curWeek);
 fillYW($('fxy'),$('fxw'),_curYear,_curWeek);
 (()=>{const sun=weekStart(_curYear,_curWeek);$('fxrange').textContent=`${fmtD(dStr(sun))} – ${fmtD(dStr(addDays(sun,6)))}`;})();
