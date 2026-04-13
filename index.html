@@ -212,6 +212,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     <div class="card"><h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Recruiting AWM</h2><div class="tbl-wrap"><table id="trec" class="dash-tbl"></table></div></div>
   </div>
   <div class="card"><h2>Top Clients</h2><div class="tbl-wrap"><table id="tclients"></table></div></div>
+  <div class="card"><h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Administration AWM</h2><div class="tbl-wrap"><table id="tadmin" class="dash-tbl"></table></div></div>
 </div>
 
 <!-- PLACEMENTS -->
@@ -632,7 +633,7 @@ function openDDByKey(key,week,year){const m=DDStore[key];if(m)openDD(m.name,m.ty
 function getWorkdays(year,week){const sun=weekStart(year,week);return[1,2,3,4,5].map(i=>dStr(addDays(sun,i)));}
 function computeWeek(year,week){
   const tdcRow=getTDCRow(year,week);const workdays=getWorkdays(year,week);
-  const byBDM={},byRec={},byClient={};
+  const byBDM={},byRec={},byClient={},byAdmin={};
   let total=0,cnt=0,adjCnt=0,contractTotal=0,contractCnt=0,passthruTotal=0,passthruCnt=0,permTotal=0,permCnt=0;
   S.placements.forEach(p=>{
     const activeDays=workdays.filter(d=>isActiveOn(p,d)).length;if(activeDays===0)return;
@@ -642,8 +643,9 @@ function computeWeek(year,week){
     const bdm=p['BDM']||'Unknown';if(!byBDM[bdm])byBDM[bdm]={awm:0,n:0,ps:[]};byBDM[bdm].awm+=contrib;if(!adj)byBDM[bdm].n++;byBDM[bdm].ps.push(p);
     const rec=p['Recruiter']||'Unknown';if(!byRec[rec])byRec[rec]={awm:0,n:0,ps:[]};byRec[rec].awm+=contrib;if(!adj)byRec[rec].n++;byRec[rec].ps.push(p);
     const cl=p['Direct client']||p['Direct Client']||'Unknown';if(!byClient[cl])byClient[cl]={awm:0,n:0,ps:[]};byClient[cl].awm+=contrib;if(!adj)byClient[cl].n++;byClient[cl].ps.push(p);
+    const adm=p['Admin']||'';if(adm){if(!byAdmin[adm])byAdmin[adm]={awm:0,n:0,ps:[]};byAdmin[adm].awm+=contrib;if(!adj)byAdmin[adm].n++;byAdmin[adm].ps.push(p);}
   });
-  return{total,cnt,adjCnt,byBDM,byRec,byClient,workdays,tdcRow,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt};
+  return{total,cnt,adjCnt,byBDM,byRec,byClient,byAdmin,workdays,tdcRow,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt};
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
@@ -664,7 +666,7 @@ function fillYW(ySel,wSel,dy=2026,dw=12){
 function renderDash(){
   if(!S.loaded){loadData();return;}
   const year=+$('dy').value,week=+$('dw').value;
-  const{total,cnt,adjCnt,byBDM,byRec,byClient,workdays,tdcRow,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt}=computeWeek(year,week);
+  const{total,cnt,adjCnt,byBDM,byRec,byClient,byAdmin,workdays,tdcRow,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt}=computeWeek(year,week);
   const g=S.goals;const sun=weekStart(year,week),fri2=addDays(sun,6);
   const dateRange=`${sun.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${fri2.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
   $('dfxwarn').style.display=tdcRow?'none':'block';
@@ -681,6 +683,19 @@ function renderDash(){
   const clRows=top.map(([nm,{awm,n,ps}],i)=>{const key=storeDDKey(`cl_${nm}_${week}_${year}`,nm,'Client',ps);return`<tr><td>${i+1}</td><td>${nm}</td><td>${n}</td><td>${fmtAWMLink(awm,`openDDByKey('${key}',${week},${year})`)}</td><td style="color:var(--muted);font-size:12px">${total?Math.round(awm/total*100):0}%</td></tr>`;}).join('');
   const restKey=storeDDKey(`cl_rest_${week}_${year}`,'All the rest','Client',rest.ps);
   $('tclients').innerHTML=`<thead><tr><th>#</th><th>Direct Client</th><th>#</th><th>AWM</th><th>Share</th></tr></thead><tbody>${clRows}${sorted.length>10?`<tr><td></td><td style="color:var(--muted)">All the rest</td><td>${rest.n}</td><td>${fmtAWMLink(rest.awm,`openDDByKey('${restKey}',${week},${year})`)}</td><td style="color:var(--muted);font-size:12px">${total?Math.round(rest.awm/total*100):0}%</td></tr>`:''}</tbody><tfoot><tr><td></td><td>Total</td><td>${cnt}</td><td>${fmtAWM(total)}</td><td>100%</td></tr></tfoot>`;
+
+  // ── Administration AWM ────────────────────────────────────────────────────
+  const admEntries=Object.entries(byAdmin).sort((a,b)=>b[1].awm-a[1].awm);
+  if(admEntries.length===0){
+    $('tadmin').innerHTML=`<thead><tr><th>Admin</th><th>#</th><th>AWM</th></tr></thead><tbody><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:16px">No admin-assigned placements this week</td></tr></tbody>`;
+  }else{
+    const admTotal=admEntries.reduce((s,[,v])=>s+v.awm,0);
+    const admRows=admEntries.map(([nm,{awm,n,ps}])=>{
+      const key=storeDDKey(`adm_${nm}_${week}_${year}`,nm,'Administration',ps);
+      return`<tr><td>${nm}</td><td>${n}</td><td>${fmtAWMLink(awm,`openDDByKey('${key}',${week},${year})`)}</td></tr>`;
+    }).join('');
+    $('tadmin').innerHTML=`<thead><tr><th>Admin</th><th>#</th><th>AWM</th></tr></thead><tbody>${admRows}</tbody><tfoot><tr><td>Total</td><td></td><td>${fmtAWM(admTotal)}</td></tr></tfoot>`;
+  }
 }
 
 // ── DRILL-DOWN ────────────────────────────────────────────────────────────────
@@ -968,7 +983,7 @@ const _now=new Date();
 const _curYear=_now.getFullYear();
 const _jan1=new Date(_curYear,0,1);
 const _firstSun=new Date(_curYear,0,1+(_jan1.getDay()===0?0:7-_jan1.getDay()));
-const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000)));
+const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000))+1);
 fillYW($('dy'),$('dw'),_curYear,_curWeek);
 fillYW($('fxy'),$('fxw'),_curYear,_curWeek);
 (()=>{const sun=weekStart(_curYear,_curWeek);$('fxrange').textContent=`${fmtD(dStr(sun))} – ${fmtD(dStr(addDays(sun,6)))}`;})();
