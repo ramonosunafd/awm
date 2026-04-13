@@ -632,7 +632,7 @@ function openDDByKey(key,week,year){const m=DDStore[key];if(m)openDD(m.name,m.ty
 // ── COMPUTE AWM ───────────────────────────────────────────────────────────────
 function getWorkdays(year,week){const sun=weekStart(year,week);return[1,2,3,4,5].map(i=>dStr(addDays(sun,i)));}
 function computeWeek(year,week){
-  const tdcRow=getTDCRow(year,week);const workdays=getWorkdays(year,week);
+  const tdcRow=getTDCRow(year,week)||getLatestTDCRow();const workdays=getWorkdays(year,week);
   const byBDM={},byRec={},byClient={},byAdmin={};
   let total=0,cnt=0,adjCnt=0,contractTotal=0,contractCnt=0,passthruTotal=0,passthruCnt=0,permTotal=0,permCnt=0;
   S.placements.forEach(p=>{
@@ -669,8 +669,14 @@ function renderDash(){
   const{total,cnt,adjCnt,byBDM,byRec,byClient,byAdmin,workdays,tdcRow,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt}=computeWeek(year,week);
   const g=S.goals;const sun=weekStart(year,week),fri2=addDays(sun,6);
   const dateRange=`${sun.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${fri2.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
-  $('dfxwarn').style.display=tdcRow?'none':'block';
-  if(tdcRow){$('fx-strip').innerHTML=`<span class="fx-date">Week ${week}: ${fmtD(tdcRow['From']||'')}–${fmtD(tdcRow['To']||'')}</span><span class="fx-pill">MXN <strong>${fmt(tdcRow['MXN']||0)}</strong></span><span class="fx-pill">BRL <strong>${fmt(tdcRow['BRL']||0)}</strong></span><span class="fx-pill">COP <strong>${fmt(tdcRow['COP']||0)}</strong></span><span class="fx-pill">CAD <strong>${fmt(tdcRow['CAD']||0)}</strong></span><span class="fx-pill">EUR <strong>${fmt(tdcRow['EUR']||0)}</strong></span>`;}else{$('fx-strip').innerHTML='';}
+  const exactTDC=getTDCRow(year,week);
+  const fallbackTDC=!exactTDC?getLatestTDCRow():null;
+  $('dfxwarn').style.display=(!exactTDC&&!fallbackTDC)?'block':'none';
+  if(exactTDC||fallbackTDC){
+    const row=exactTDC||fallbackTDC;
+    const weekLabel=fallbackTDC?` (using week ${fallbackTDC['Week']} rates as estimate)`:'';
+    $('fx-strip').innerHTML=`<span class="fx-date">Week ${week}${weekLabel}</span><span class="fx-pill">MXN <strong>${fmt(row['MXN']||0)}</strong></span><span class="fx-pill">BRL <strong>${fmt(row['BRL']||0)}</strong></span><span class="fx-pill">COP <strong>${fmt(row['COP']||0)}</strong></span><span class="fx-pill">CAD <strong>${fmt(row['CAD']||0)}</strong></span><span class="fx-pill">EUR <strong>${fmt(row['EUR']||0)}</strong></span>`;
+  }else{$('fx-strip').innerHTML='';}
   $('dstat-total').innerHTML=`<div class="stat"><div class="lbl">Total AWM — Week ${week} &nbsp;<span style="font-size:11px;color:var(--muted)">${dateRange}</span></div><div class="val" style="font-size:36px;color:${total<0?'var(--danger)':'var(--text)'}">$${fmt(total)}</div>${tlLegend(total,g.t1,g.t2,g.t3)}</div>`;
   const mc=(lbl,val,sub)=>`<div class="mini-stat"><div class="lbl">${lbl}</div><div class="val">$${fmt(val)}</div><div style="font-size:11px;color:var(--muted)">${sub}</div></div>`;
   $('dstat-avgs').innerHTML=mc('Avg AWM / placement',cnt?total/cnt:0,`${cnt} active excl. adjustments`)+mc('Contract avg',contractCnt?contractTotal/contractCnt:0,`${contractCnt} contract`)+mc('Passthru avg',passthruCnt?passthruTotal/passthruCnt:0,`${passthruCnt} passthru`)+mc('Perm avg',permCnt?permTotal/permCnt:0,`${permCnt} perm`);
@@ -700,7 +706,7 @@ function renderDash(){
 
 // ── DRILL-DOWN ────────────────────────────────────────────────────────────────
 function openDD(name,type,placements,week,year){
-  const tdcRow=getTDCRow(year,week);const workdays=getWorkdays(year,week);
+  const tdcRow=getTDCRow(year,week)||getLatestTDCRow();const workdays=getWorkdays(year,week);
   $('dd-name').textContent=name;$('dd-sub').textContent=`${type} — Week ${week}, ${year} — Avg AWM = margin × active days ÷ 5`;
   let total=0;
   const rows=placements.map((p,i)=>{
@@ -718,7 +724,8 @@ function closeDD(){$('dd').classList.remove('open');}
 function openWAG(){
   if(!S.loaded){toast('Data not loaded yet');return;}
   const year=+$('dy').value,week=+$('dw').value;
-  const tdcRow=getTDCRow(year,week);const workdays=getWorkdays(year,week);
+  const tdcRow=getTDCRow(year,week)||getLatestTDCRow();
+  const workdays=getWorkdays(year,week);
   const sun=weekStart(year,week),fri2=addDays(sun,6);
   const dayLabels=['Mon','Tue','Wed','Thu','Fri'];
   const dayDates=workdays.map(d=>{const p=d.split('-');return`${p[1]}/${p[2]}`;});
