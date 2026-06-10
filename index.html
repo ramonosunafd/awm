@@ -548,7 +548,7 @@ function calcMargin(p,tdcRow){
   const Sv=parseN(p['Frequency Cost']||168)||168,T=parseN(p['Taxes on Cost %']||0);
   const U=parseN(p['Fees Cost $/hr']||0),V=String(p['Currency of Taxes or fees based Cost']||'USD').trim(),W=getFXRate(V,tdcRow);
   const X=parseN(p['Taxes or fees based on BILL RATE in %']||0),AB=parseN(p['Rate in local currency']||0);
-  const AC=String(p['Currency of Rate']||'USD').trim(),AD=getFXRate(AC,tdcRow),AE=parseN(p['Frequency Bill Rate']||1)||1;
+  const AC=String(p['Currency of Rate']||'USD').trim(),AD=getFXRate(AC,tdcRow),AE=parseN(p['Frequency Bill Rate']||0)||(isPermType(p['Type']||'')?160:1);
   const AF=parseN(p['Taxes on Cost % (Rate)']||0),AG=parseN(p['Fees Rate $/hr']||0);
   const AH=String(p['Currency of Taxes or fees based Bill Rate']||'USD').trim(),AI=getFXRate(AH,tdcRow);
   const AJ=parseN(p['Taxes or fees based on RATE in %']||0),AO=parseN(p['% time assigned - %']||1)||1;
@@ -815,7 +815,7 @@ function calcPreview(){
   const Sv=parseN($('fS').value||168)||168,T=parseN($('fT').value||0),U=parseN($('fU').value||0);
   const V=String($('fV').value||'USD').trim(),W=getFXRate(V,tdcRow),X=parseN($('fX').value||0);
   const AB=parseN($('fAB').value||0),AC=String($('fAC').value||'USD').trim(),AD=getFXRate(AC,tdcRow);
-  const AE=parseN($('fAE').value||1)||1,AF=parseN($('fAF').value||0),AG=parseN($('fAG').value||0);
+  const AE=parseN($('fAE').value||0)||(isPermType($('ft').value)?160:1),AF=parseN($('fAF').value||0),AG=parseN($('fAG').value||0);
   const AH=String($('fAH').value||'USD').trim(),AI=getFXRate(AH,tdcRow),AJ=parseN($('fAJ').value||0),AO=getAOValue()||1;
   const costUSD=(P/Sv/R)*(1+T)+(U/W)+(AB/AD/AE)*X;const rateUSD=(AB/AD/AE)+(P/R/Sv)*AF+(AG/AI)+(AB/AD/AE)*AJ;const margin=(rateUSD-costUSD)*AO;
   const c=isFinite(costUSD)?costUSD:0,r=isFinite(rateUSD)?rateUSD:0,m=isFinite(margin)?margin:0;
