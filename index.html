@@ -228,7 +228,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
     <select id="plst" onchange="renderPL()"><option value="">All statuses</option><option value="active">Active</option><option value="ended">Ended</option></select>
-    <select id="plty" onchange="renderPL()"><option value="">All types</option><option>Contract</option><option>Passthru</option><option>Perm</option><option>Adjustment (Contract)</option><option>Adjustment (PT)</option></select>
+    <select id="plty" onchange="renderPL()"><option value="">All types</option><option>Contract</option><option>Passthru</option><option>Perm</option><option>Adjustment (Contract)</option><option>Adjustment (PT)</option><option>Adjustment (Perm)</option></select>
     <select id="plbd" onchange="renderPL()"><option value="">All BDMs</option></select>
     <select id="plrc" onchange="renderPL()"><option value="">All Recruiters</option></select>
     <div style="display:flex;align-items:center;gap:6px;grid-column:1/-1;flex-wrap:wrap">
@@ -380,7 +380,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
   <div class="sec-lbl sec-lbl-info">Placement Info</div>
   <div class="form-row">
     <div><label>Placement # (auto)</label><input id="fi" disabled placeholder="Auto-assigned" style="background:#f5f5f3;color:var(--muted);font-style:italic"></div>
-    <div><label>Type *</label><select id="ft"><option>Contract</option><option>Passthru</option><option>Perm</option><option>Adjustment (Contract)</option><option>Adjustment (PT)</option></select></div>
+    <div><label>Type *</label><select id="ft" onchange="onTypeChange()"><option>Contract</option><option>Passthru</option><option>Perm</option><option>Adjustment (Contract)</option><option>Adjustment (PT)</option><option>Adjustment (Perm)</option></select></div>
     <div><label># Placed</label><input id="fp" type="number" value="1"></div>
   </div>
   <div class="form-row">
@@ -529,9 +529,15 @@ function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
 function dStr(d){return d.toISOString().slice(0,10);}
 function isActiveOn(p,day){const s=p['Start date']||p['Start']||'';const e=p['End date']||p['End']||'';if(!s||s>day)return false;if(e&&e<day)return false;return true;}
 function isAdj(p){return(p['Type']||'').startsWith('Adjustment');}
-function isPerm(p){return(p['Type']||'')==='Perm';}
+function isPerm(p){return isPermType(p['Type']||'');}
+function isPermType(t){return t==='Perm'||t==='Adjustment (Perm)';}
 function isPassthru(p){return(p['Type']||'')==='Passthru';}
 function typeBadge(t){if(!t)return'';if(t.startsWith('Adjustment'))return`<span class="badge badge-adj">${t}</span>`;if(t==='Perm')return`<span class="badge badge-perm">Perm</span>`;return`<span class="badge badge-gray">${t}</span>`;}
+function onTypeChange(){
+  const t=$('ft').value;const ae=$('fAE');
+  if(isPermType(t)){ae.value='160';ae.disabled=true;ae.style.background='#f5f5f3';ae.style.color='var(--muted)';}
+  else{ae.disabled=false;ae.style.background='';ae.style.color='';}
+}
 function getTDCRow(year,week){return S.tdc.find(r=>String(r['Year']||r['year'])===String(year)&&String(r['Week']||r['week'])===String(week));}
 function getLatestTDCRow(){if(!S.tdc.length)return null;return[...S.tdc].sort((a,b)=>{const ay=+a['Year'],aw=+a['Week'],by=+b['Year'],bw=+b['Week'];return by!==ay?by-ay:bw-aw;})[0];}
 function getFXRate(currency,tdcRow){if(!currency||currency==='USD')return 1;if(!tdcRow)return 1;return parseN(tdcRow[String(currency).trim().toUpperCase()])||1;}
@@ -826,7 +832,7 @@ function openPL(existing){
   re.innerHTML=S.people.rec.map(n=>`<option>${n}</option>`).join('');
   ad.innerHTML='<option value="">— none —</option>'+S.people.adm.map(n=>`<option>${n}</option>`).join('');
   if(existing){
-    $('fi').value=`#${existing['Num']}`;$('fp').value=existing['Place']||1;$('ft').value=existing['Type']||'Contract';
+    $('fi').value=`#${existing['Num']}`;$('fp').value=existing['Place']||1;$('ft').value=existing['Type']||'Contract';onTypeChange();
     $('fn').value=existing['Consultant Name']||'';$('fr').value=existing['Role']||'';
     $('fdc').value=existing['Direct client']||existing['Direct Client']||'';$('fec').value=existing['End client']||existing['End Client']||'';
     setCountryVal('fcdc','fcdc-other',existing['Country - Direct client']||'USA');setCountryVal('fcec','fcec-other',existing['Country - End client']||'USA');
@@ -844,7 +850,7 @@ function openPL(existing){
     $('fi').value='Auto-assigned';['fn','fr','fdc','fec','fch','fno','fP','fAB'].forEach(id=>$(id).value='');
     ['fQ','fS','fV','fAC','fAE','fAH'].forEach(id=>$(id).value='');['fT','fU','fX','fAF','fAG','fAJ'].forEach(id=>$(id).value='0');
     $('fp').value=1;$('fsd').value='';$('fed').value='';$('flm').value='';
-    setCountryVal('fcdc','fcdc-other','USA');setCountryVal('fcec','fcec-other','USA');$('fAO_type').value='1';toggleAOInput();
+    setCountryVal('fcdc','fcdc-other','USA');setCountryVal('fcec','fcec-other','USA');$('fAO_type').value='1';toggleAOInput();onTypeChange();
   }
   $('mpl').classList.add('open');
 }
