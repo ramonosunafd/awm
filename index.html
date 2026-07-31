@@ -265,14 +265,14 @@ tfoot td{background:#f9f9f7;font-weight:600}
   <div id="req-approvals-wrap" style="display:none;margin-bottom:28px">
     <h2 style="font-size:15px;font-weight:600;margin-bottom:10px">Pending Approvals</h2>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table>
-      <thead><tr><th>Submitted</th><th>Requested By</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th></th></tr></thead>
+      <thead><tr><th>Submitted</th><th>Requested By</th><th>Request</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th></th></tr></thead>
       <tbody id="tbreqpending"></tbody>
     </table></div></div>
   </div>
   <div>
     <h2 style="font-size:15px;font-weight:600;margin-bottom:10px" id="req-mine-title">My Requests</h2>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table>
-      <thead><tr><th>Submitted</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th>Status</th><th>Reviewed By</th><th></th></tr></thead>
+      <thead><tr><th>Submitted</th><th>Request</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th>Status</th><th>Reviewed By</th><th></th></tr></thead>
       <tbody id="tbreqmine"></tbody>
     </table></div></div>
   </div>
@@ -520,7 +520,7 @@ const ALLOWED_DOMAIN='fastdolphin.com';
 
 const S={placements:[],tdc:[],requests:[],loaded:false,loading:false,people:{bdm:[],rec:[],adm:[]},
   goals:{s1:199,s2:299,s3:399,r1:89,r2:139,r3:199,t1:1299,t2:1599,t3:1999},
-  editing:null,requestMode:false,resubmitOf:null,currentUser:null,role:'readonly'};
+  editing:null,requestMode:false,resubmitOf:null,editRequestNum:null,currentUser:null,role:'readonly'};
 
 const ROLES={
   'ramon.osuna@fastdolphin.com':'admin',
@@ -843,7 +843,7 @@ function renderPL(){
   let totalMargin=0,totalCost=0,totalRate=0;
   const rows=list.map(p=>{
     const{margin:m,costUSD:c,rateUSD:r}=calcMargin(p,tdcRow);totalMargin+=m;totalCost+=c;totalRate+=r;
-    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap">${canWrite('placements')?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:''}</td></tr>`;
+    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap">${canWrite('placements')?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(canRequest()?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button>`:'')}</td></tr>`;
   }).join('')||'<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:24px">No placements found</td></tr>';
   $('tbpl').innerHTML=rows+`<tr style="background:#f9f9f7;border-top:2px solid var(--border)"><td colspan="9" style="text-align:right;font-weight:600;color:var(--muted);font-size:12px">${list.length} placement${list.length!==1?'s':''} shown</td><td style="color:var(--muted);font-weight:600">$${fmt(totalCost)}</td><td style="color:var(--muted);font-weight:600">$${fmt(totalRate)}</td><td style="font-weight:700">${totalMargin<0?`<span class="awm-neg">($${fmt(Math.abs(totalMargin))})</span>`:`$${fmt(totalMargin)}`}</td><td colspan="3"></td></tr>`;
 }
@@ -868,12 +868,14 @@ function calcPreview(){
   $('prev-cost').textContent=`$${fmt(c)}`;$('prev-rate').textContent=`$${fmt(r)}`;$('prev-margin').textContent=`$${fmt(m)}`;$('prev-margin').className='calc-value margin'+(m<0?' neg':'');
   $('calc-preview').classList.add('visible');if(tdcRow)toast(`Preview using TDC: ${tdcRow['Year']} Week ${tdcRow['Week']}`);
 }
-function openPL(existing,requestMode){
+function openPL(existing,requestMode,editRequestNum){
   S.requestMode=!!requestMode;
   S.resubmitOf=null;
+  S.editRequestNum=editRequestNum||null;
   S.editing=(existing&&!S.requestMode)?existing['Num']:null;
-  $('mpl-title').textContent=S.requestMode?(existing?'Amend & Resubmit Request':'Submit Placement for Approval'):(existing?'Edit Placement':'New Placement');
-  $('mpl-sub').textContent=S.requestMode?'This will go to Carlos or Ramon for approval before it appears in the Google Sheet.':(existing?`Placement #${existing['Num']} — ${existing['Consultant Name']||''}`:'Fill in the details below. Use Calculate Preview before saving.');
+  const isEditReq=!!S.editRequestNum;
+  $('mpl-title').textContent=isEditReq?`Request Edit — Placement #${S.editRequestNum}`:(S.requestMode?(existing?'Amend & Resubmit Request':'Submit Placement for Approval'):(existing?'Edit Placement':'New Placement'));
+  $('mpl-sub').textContent=isEditReq?'These changes will go to Carlos or Ramon for approval before updating the Google Sheet.':(S.requestMode?'This will go to Carlos or Ramon for approval before it appears in the Google Sheet.':(existing?`Placement #${existing['Num']} — ${existing['Consultant Name']||''}`:'Fill in the details below. Use Calculate Preview before saving.'));
   const saveBtn=$('mpl-save-btn');
   saveBtn.textContent=S.requestMode?'Submit for Approval':'Save to Google Sheet';
   saveBtn.onclick=S.requestMode?submitPL:savePL;
@@ -883,7 +885,7 @@ function openPL(existing,requestMode){
   re.innerHTML=S.people.rec.map(n=>`<option>${n}</option>`).join('');
   ad.innerHTML='<option value="">— none —</option>'+S.people.adm.map(n=>`<option>${n}</option>`).join('');
   if(existing){
-    $('fi').value=(!S.requestMode&&existing['Num'])?`#${existing['Num']}`:'Auto-assigned';$('fp').value=existing['Place']||1;$('ft').value=existing['Type']||'Contract';onTypeChange();
+    $('fi').value=(!S.requestMode&&existing['Num'])?`#${existing['Num']}`:(isEditReq?`#${S.editRequestNum} (pending approval)`:'Auto-assigned');$('fp').value=existing['Place']||1;$('ft').value=existing['Type']||'Contract';onTypeChange();
     $('fn').value=existing['Consultant Name']||'';$('fr').value=existing['Role']||'';
     $('fdc').value=existing['Direct client']||existing['Direct Client']||'';$('fec').value=existing['End client']||existing['End Client']||'';
     setCountryVal('fcdc','fcdc-other',existing['Country - Direct client']||'USA');setCountryVal('fcec','fcec-other',existing['Country - End client']||'USA');
@@ -905,10 +907,16 @@ function openPL(existing,requestMode){
   }
   $('mpl').classList.add('open');
 }
+function openEditRequestPL(num){
+  const p=S.placements.find(x=>String(x['Num'])===String(num));if(!p)return;
+  openPL(p,true,num);
+}
 function openResubmitPL(requestId){
   const r=S.requests.find(x=>String(x['RequestId'])===String(requestId));if(!r)return;
   if(r['Status']!=='Rejected'){toast('Only rejected requests can be amended');return;}
-  openPL(r['DataParsed']||{},true);
+  const d=r['DataParsed']||{};
+  const isEdit=(r['RequestType']||'add')==='edit';
+  openPL(d,true,isEdit?d['Num']:null);
   S.resubmitOf=requestId;
 }
 function editPL(id){const p=S.placements.find(x=>String(x['Num'])===String(id));if(p)openPL(p);}
@@ -934,12 +942,13 @@ async function submitPL(){
   const name=$('fn').value.trim(),role=$('fr').value.trim(),dc=$('fdc').value.trim();
   const bdm=$('fbd').value,rec=$('fre').value,start=$('fsd').value;
   if(!name||!role||!dc||!bdm||!rec||!start){alert('Fill all required fields (*)');return;}
-  const data={'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
-  toast('Submitting for approval…');
-  const res=await apiPost({action:'submitPlacementRequest',data,amendsRequestId:S.resubmitOf||''});
+  const data={...(S.editRequestNum?{'Num':S.editRequestNum}:{}),'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
+  const isEditReq=!!S.editRequestNum;
+  toast(isEditReq?'Submitting edit for approval…':'Submitting for approval…');
+  const res=await apiPost({action:'submitPlacementRequest',data,amendsRequestId:S.resubmitOf||'',requestType:isEditReq?'edit':'add'});
   if(res.error){toast('Error: '+res.error);return;}
-  closeM('mpl');toast('✓ Submitted — awaiting approval from Carlos or Ramon');
-  S.resubmitOf=null;
+  closeM('mpl');toast(isEditReq?'✓ Edit submitted — awaiting approval from Carlos or Ramon':'✓ Submitted — awaiting approval from Carlos or Ramon');
+  S.resubmitOf=null;S.editRequestNum=null;
   await loadRequests();renderRequests();
 }
 
@@ -975,29 +984,47 @@ function calcMarginPreviewFromData(data){
 function openReqReview(requestId,mode){
   const r=S.requests.find(x=>String(x['RequestId'])===String(requestId));if(!r)return;
   const d=r['DataParsed']||{};
-  $('mreq-sub').textContent=`Submitted by ${r['RequestedBy']||''} on ${r['Timestamp']||''}${r['Status']&&r['Status']!=='Pending'?` — ${r['Status']} by ${r['ReviewedBy']||''}${r['Status']==='Rejected'&&r['RejectionReason']?`: "${r['RejectionReason']}"`:''}`:''}`;
+  const isEdit=(r['RequestType']||'add')==='edit';
+  const cur=isEdit?(S.placements.find(x=>String(x['Num'])===String(d['Num']))||{}):{};
+  $('mreq-title').textContent=isEdit?'Review Edit Request':'Review Placement Request';
+  $('mreq-sub').textContent=`${isEdit?`Edit request for Placement #${d['Num']||''} — `:''}Submitted by ${r['RequestedBy']||''} on ${r['Timestamp']||''}${r['Status']&&r['Status']!=='Pending'?` — ${r['Status']} by ${r['ReviewedBy']||''}${r['Status']==='Rejected'&&r['RejectionReason']?`: "${r['RejectionReason']}"`:''}`:''}`;
   const{margin:m,costUSD:c,rateUSD:rt,tdcRow}=calcMarginPreviewFromData(d);
   let amendNote='';
   if(r['AmendsRequestId']){
     const orig=S.requests.find(x=>String(x['RequestId'])===String(r['AmendsRequestId']));
     if(orig)amendNote=`<div class="alert-warn" style="margin-bottom:12px">↻ This is a corrected resubmission of a request rejected ${orig['ReviewedAt']?('on '+orig['ReviewedAt']):''} by ${orig['ReviewedBy']||''}${orig['RejectionReason']?`: "${orig['RejectionReason']}"`:''}</div>`;
   }
+  const field=(label,key,fmtFn)=>{
+    const proposedRaw=d[key];
+    const proposed=fmtFn?fmtFn(proposedRaw):proposedRaw;
+    if(isEdit){
+      const currentRaw=cur[key];
+      const current=fmtFn?fmtFn(currentRaw):currentRaw;
+      if(String(currentRaw??'')!==String(proposedRaw??'')){
+        const curDisp=(current===undefined||current===null||current==='')?'—':current;
+        const propDisp=(proposed===undefined||proposed===null||proposed==='')?'—':proposed;
+        return`<div><label style="margin-bottom:2px">${label}</label><div style="padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)"><span style="color:var(--muted);text-decoration:line-through">${curDisp}</span> → <span style="color:var(--accent);font-weight:600">${propDisp}</span></div></div>`;
+      }
+    }
+    return reqDetailRow(label,proposed);
+  };
   $('mreq-body').innerHTML=`
     ${amendNote}
+    ${isEdit?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Fields with no change are shown as-is; changed fields show <span style="text-decoration:line-through">current</span> → <strong style="color:var(--accent)">proposed</strong>.</div>`:''}
     <div class="sec-lbl sec-lbl-info">Placement Info</div>
-    <div class="form-row">${reqDetailRow('Type',d['Type'])}${reqDetailRow('# Placed',d['Place'])}${reqDetailRow('Consultant',d['Consultant Name'])}</div>
-    <div class="form-row">${reqDetailRow('Role',d['Role'])}${reqDetailRow('Direct client',d['Direct client'])}${reqDetailRow('End client',d['End client'])}</div>
-    <div class="form-row">${reqDetailRow('Country (direct)',d['Country - Direct client'])}${reqDetailRow('Country (end)',d['Country - End client'])}</div>
-    <div class="form-row">${reqDetailRow('BDM',d['BDM'])}${reqDetailRow('Recruiter',d['Recruiter'])}${reqDetailRow('Admin',d['Admin'])}</div>
-    <div class="form-row">${reqDetailRow('Start date',fmtD(d['Start date']))}${reqDetailRow('End date',fmtD(d['End date']))}${reqDetailRow('Length (months)',d['Length in months'])}</div>
+    <div class="form-row">${field('Type','Type')}${field('# Placed','Place')}${field('Consultant','Consultant Name')}</div>
+    <div class="form-row">${field('Role','Role')}${field('Direct client','Direct client')}${field('End client','End client')}</div>
+    <div class="form-row">${field('Country (direct)','Country - Direct client')}${field('Country (end)','Country - End client')}</div>
+    <div class="form-row">${field('BDM','BDM')}${field('Recruiter','Recruiter')}${field('Admin','Admin')}</div>
+    <div class="form-row">${field('Start date','Start date',fmtD)}${field('End date','End date',fmtD)}${field('Length (months)','Length in months')}</div>
     <div class="sec-lbl sec-lbl-cost">Cost</div>
-    <div class="form-row">${reqDetailRow('Cost in local currency (P)',d['Cost in local currency'])}${reqDetailRow('Currency of Cost (Q)',d['Currency of Cost'])}${reqDetailRow('Frequency Cost (S)',d['Frequency Cost'])}</div>
-    <div class="form-row">${reqDetailRow('Taxes on Cost % (T)',d['Taxes on Cost %'])}${reqDetailRow('Fees Cost $/hr (U)',d['Fees Cost $/hr'])}${reqDetailRow('Currency of Fees on Cost (V)',d['Currency of Taxes or fees based Cost'])}</div>
-    <div class="form-row">${reqDetailRow('Taxes on Bill Rate % applied to Cost (X)',d['Taxes or fees based on BILL RATE in %'])}</div>
+    <div class="form-row">${field('Cost in local currency (P)','Cost in local currency')}${field('Currency of Cost (Q)','Currency of Cost')}${field('Frequency Cost (S)','Frequency Cost')}</div>
+    <div class="form-row">${field('Taxes on Cost % (T)','Taxes on Cost %')}${field('Fees Cost $/hr (U)','Fees Cost $/hr')}${field('Currency of Fees on Cost (V)','Currency of Taxes or fees based Cost')}</div>
+    <div class="form-row">${field('Taxes on Bill Rate % applied to Cost (X)','Taxes or fees based on BILL RATE in %')}</div>
     <div class="sec-lbl sec-lbl-rate">Bill Rate</div>
-    <div class="form-row">${reqDetailRow('Rate in local currency (AB)',d['Rate in local currency'])}${reqDetailRow('Currency of Rate (AC)',d['Currency of Rate'])}${reqDetailRow('Frequency Bill Rate (AE)',d['Frequency Bill Rate'])}</div>
-    <div class="form-row">${reqDetailRow('Taxes on Cost % for Rate (AF)',d['Taxes on Cost % (Rate)'])}${reqDetailRow('Fees Rate $/hr (AG)',d['Fees Rate $/hr'])}${reqDetailRow('Currency of Fees on Rate (AH)',d['Currency of Taxes or fees based Bill Rate'])}</div>
-    <div class="form-row">${reqDetailRow('Taxes on Rate % (AJ)',d['Taxes or fees based on RATE in %'])}</div>
+    <div class="form-row">${field('Rate in local currency (AB)','Rate in local currency')}${field('Currency of Rate (AC)','Currency of Rate')}${field('Frequency Bill Rate (AE)','Frequency Bill Rate')}</div>
+    <div class="form-row">${field('Taxes on Cost % for Rate (AF)','Taxes on Cost % (Rate)')}${field('Fees Rate $/hr (AG)','Fees Rate $/hr')}${field('Currency of Fees on Rate (AH)','Currency of Taxes or fees based Bill Rate')}</div>
+    <div class="form-row">${field('Taxes on Rate % (AJ)','Taxes or fees based on RATE in %')}</div>
     <div class="sec-lbl sec-lbl-time">% Time Assigned</div>
     <div class="form-row">${reqDetailRow('% time assigned',d['% time assigned - %']?(parseN(d['% time assigned - %'])*100).toFixed(0)+'%':'')}</div>
     <div class="calc-preview visible" style="margin-top:8px">
@@ -1007,8 +1034,8 @@ function openReqReview(requestId,mode){
     </div>
     <div style="font-size:11px;color:var(--muted);margin-top:4px">${tdcRow?`Using most recent TDC: ${tdcRow['Year']} Week ${tdcRow['Week']}`:'No exchange rate data available — figures assume USD'}</div>
     <div class="sec-lbl sec-lbl-info" style="margin-top:16px">Additional</div>
-    <div class="form-row"><div style="grid-column:1/-1">${reqDetailRow('Chain of contracting companies',d['Chain of contracting companies'])}</div></div>
-    ${reqDetailRow('Notes',d['Notes'])}
+    <div class="form-row"><div style="grid-column:1/-1">${field('Chain of contracting companies','Chain of contracting companies')}</div></div>
+    ${field('Notes','Notes')}
   `;
   const approveBtn=$('mreq-approve-btn'),rejectBtn=$('mreq-reject-btn');
   if(mode==='approve'&&r['Status']==='Pending'){
@@ -1028,6 +1055,8 @@ function renderRequests(){
     const pending=S.requests.filter(r=>r['Status']==='Pending');
     $('tbreqpending').innerHTML=pending.map(r=>{
       const d=r['DataParsed']||{};
+      const isEdit=(r['RequestType']||'add')==='edit';
+      const reqTypeBadge=isEdit?`<span class="badge badge-perm">Edit #${d['Num']||''}</span>`:`<span class="badge badge-gray">New</span>`;
       let resubmitBadge='';
       if(r['AmendsRequestId']){
         const orig=S.requests.find(x=>String(x['RequestId'])===String(r['AmendsRequestId']));
@@ -1036,17 +1065,21 @@ function renderRequests(){
           resubmitBadge=`<div style="margin-top:3px"><span class="badge badge-adj" title="${reason}">↻ Resubmission</span></div>`;
         }
       }
-      return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td>${r['RequestedBy']||''}</td><td><strong>${d['Consultant Name']||''}</strong>${resubmitBadge}</td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="openReqReview('${r['RequestId']}','approve')">Review</button></td></tr>`;
-    }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No pending requests</td></tr>';
+      return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td>${r['RequestedBy']||''}</td><td>${reqTypeBadge}</td><td><strong>${d['Consultant Name']||''}</strong>${resubmitBadge}</td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="openReqReview('${r['RequestId']}','approve')">Review</button></td></tr>`;
+    }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No pending requests</td></tr>';
   }
   const mine=S.requests.filter(r=>(r['RequestedBy']||'').toLowerCase()===(S.currentUser?.email||'').toLowerCase());
   $('tbreqmine').innerHTML=mine.map(r=>{
     const d=r['DataParsed']||{};
+    const isEdit=(r['RequestType']||'add')==='edit';
+    const reqTypeBadge=isEdit?`<span class="badge badge-perm">Edit #${d['Num']||''}</span>`:`<span class="badge badge-gray">New</span>`;
     const statusColor=r['Status']==='Approved'?'var(--accent)':(r['Status']==='Rejected'?'var(--danger)':'var(--muted)');
-    return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="font-weight:600;color:${statusColor}" title="${r['Status']==='Rejected'?(r['RejectionReason']||'').replace(/"/g,''):''}">${r['Status']||''}</td><td style="font-size:12px;color:var(--muted)">${r['ReviewedBy']||'—'}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="openReqReview('${r['RequestId']}','view')">View</button>${r['Status']==='Rejected'?` <button class="btn btn-primary btn-sm" onclick="openResubmitPL('${r['RequestId']}')">Amend &amp; Resubmit</button>`:''}</td></tr>`;
-  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No requests submitted yet</td></tr>';
+    return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td>${reqTypeBadge}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="font-weight:600;color:${statusColor}" title="${r['Status']==='Rejected'?(r['RejectionReason']||'').replace(/"/g,''):''}">${r['Status']||''}</td><td style="font-size:12px;color:var(--muted)">${r['ReviewedBy']||'—'}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="openReqReview('${r['RequestId']}','view')">View</button>${r['Status']==='Rejected'?` <button class="btn btn-primary btn-sm" onclick="openResubmitPL('${r['RequestId']}')">Amend &amp; Resubmit</button>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px">No requests submitted yet</td></tr>';
 }
 async function actOnRequest(requestId,type){
+  const r=S.requests.find(x=>String(x['RequestId'])===String(requestId));
+  const isEdit=r&&(r['RequestType']||'add')==='edit';
   if(type==='reject'){
     const reason=prompt('Reason for rejection (optional):')||'';
     toast('Rejecting…');
@@ -1054,11 +1087,11 @@ async function actOnRequest(requestId,type){
     if(res.error){toast('Error: '+res.error);return;}
     toast('Request rejected');
   }else{
-    if(!confirm('Approve this placement? It will be added to the Google Sheet.'))return;
+    if(!confirm(isEdit?'Approve these changes? The live placement will be updated in the Google Sheet.':'Approve this placement? It will be added to the Google Sheet.'))return;
     toast('Approving…');
     const res=await apiPost({action:'approvePlacementRequest',requestId});
     if(res.error){toast('Error: '+res.error);return;}
-    toast('✓ Approved and added to Google Sheet');
+    toast('✓ '+(res.message||'Approved'));
     S.loaded=false;
   }
   await loadRequests();renderRequests();
