@@ -269,7 +269,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
   <div>
     <h2 style="font-size:15px;font-weight:600;margin-bottom:10px" id="req-mine-title">My Requests</h2>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table>
-      <thead><tr><th>Submitted</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th>Status</th><th>Reviewed By</th></tr></thead>
+      <thead><tr><th>Submitted</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>Type</th><th>Start</th><th>Status</th><th>Reviewed By</th><th></th></tr></thead>
       <tbody id="tbreqmine"></tbody>
     </table></div></div>
   </div>
@@ -472,6 +472,18 @@ tfoot td{background:#f9f9f7;font-weight:600}
   <div class="modal-footer">
     <button class="btn btn-secondary" onclick="closeM('mpl')">Cancel</button>
     <button class="btn btn-primary" id="mpl-save-btn" onclick="savePL()">Save to Google Sheet</button>
+  </div>
+</div></div>
+
+<!-- REQUEST REVIEW MODAL -->
+<div class="modal-bg" id="mreq"><div class="modal">
+  <h3 id="mreq-title">Review Placement Request</h3>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:4px" id="mreq-sub"></p>
+  <div id="mreq-body"></div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeM('mreq')">Close</button>
+    <button class="btn btn-danger" id="mreq-reject-btn" style="display:none">Reject</button>
+    <button class="btn btn-primary" id="mreq-approve-btn" style="display:none">Approve</button>
   </div>
 </div></div>
 
@@ -929,6 +941,68 @@ async function loadRequests(){
     S.requests=res.rows||[];
   }catch(err){console.error(err);toast('Failed to load requests');}
 }
+function reqDetailRow(label,value){
+  if(value===undefined||value===null||value==='')value='—';
+  return`<div><label style="margin-bottom:2px">${label}</label><div style="padding:6px 0;font-size:13px;color:var(--text);border-bottom:1px solid var(--border)">${value}</div></div>`;
+}
+function calcMarginPreviewFromData(data){
+  const tdcRow=getLatestTDCRow();
+  const P=parseN(data['Cost in local currency']||0),Q=String(data['Currency of Cost']||'USD').trim(),R=getFXRate(Q,tdcRow);
+  const Sv=parseN(data['Frequency Cost']||168)||168,T=parseN(data['Taxes on Cost %']||0);
+  const U=parseN(data['Fees Cost $/hr']||0),V=String(data['Currency of Taxes or fees based Cost']||'USD').trim(),W=getFXRate(V,tdcRow);
+  const X=parseN(data['Taxes or fees based on BILL RATE in %']||0),AB=parseN(data['Rate in local currency']||0);
+  const AC=String(data['Currency of Rate']||'USD').trim(),AD=getFXRate(AC,tdcRow);
+  const AE=parseN(data['Frequency Bill Rate']||0)||(isPermType(data['Type']||'')?160:1);
+  const AF=parseN(data['Taxes on Cost % (Rate)']||0),AG=parseN(data['Fees Rate $/hr']||0);
+  const AH=String(data['Currency of Taxes or fees based Bill Rate']||'USD').trim(),AI=getFXRate(AH,tdcRow);
+  const AJ=parseN(data['Taxes or fees based on RATE in %']||0),AO=parseN(data['% time assigned - %']||1)||1;
+  const costUSD=(P/Sv/R)*(1+T)+(U/W)+(AB/AD/AE)*X;
+  const rateUSD=(AB/AD/AE)+(P/R/Sv)*AF+(AG/AI)+(AB/AD/AE)*AJ;
+  const margin=(rateUSD-costUSD)*AO;
+  return{margin:isFinite(margin)?margin:0,costUSD:isFinite(costUSD)?costUSD:0,rateUSD:isFinite(rateUSD)?rateUSD:0,tdcRow};
+}
+function openReqReview(requestId,mode){
+  const r=S.requests.find(x=>String(x['RequestId'])===String(requestId));if(!r)return;
+  const d=r['DataParsed']||{};
+  $('mreq-sub').textContent=`Submitted by ${r['RequestedBy']||''} on ${r['Timestamp']||''}${r['Status']&&r['Status']!=='Pending'?` — ${r['Status']} by ${r['ReviewedBy']||''}`:''}`;
+  const{margin:m,costUSD:c,rateUSD:rt,tdcRow}=calcMarginPreviewFromData(d);
+  $('mreq-body').innerHTML=`
+    <div class="sec-lbl sec-lbl-info">Placement Info</div>
+    <div class="form-row">${reqDetailRow('Type',d['Type'])}${reqDetailRow('# Placed',d['Place'])}${reqDetailRow('Consultant',d['Consultant Name'])}</div>
+    <div class="form-row">${reqDetailRow('Role',d['Role'])}${reqDetailRow('Direct client',d['Direct client'])}${reqDetailRow('End client',d['End client'])}</div>
+    <div class="form-row">${reqDetailRow('Country (direct)',d['Country - Direct client'])}${reqDetailRow('Country (end)',d['Country - End client'])}</div>
+    <div class="form-row">${reqDetailRow('BDM',d['BDM'])}${reqDetailRow('Recruiter',d['Recruiter'])}${reqDetailRow('Admin',d['Admin'])}</div>
+    <div class="form-row">${reqDetailRow('Start date',fmtD(d['Start date']))}${reqDetailRow('End date',fmtD(d['End date']))}${reqDetailRow('Length (months)',d['Length in months'])}</div>
+    <div class="sec-lbl sec-lbl-cost">Cost</div>
+    <div class="form-row">${reqDetailRow('Cost in local currency (P)',d['Cost in local currency'])}${reqDetailRow('Currency of Cost (Q)',d['Currency of Cost'])}${reqDetailRow('Frequency Cost (S)',d['Frequency Cost'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Cost % (T)',d['Taxes on Cost %'])}${reqDetailRow('Fees Cost $/hr (U)',d['Fees Cost $/hr'])}${reqDetailRow('Currency of Fees on Cost (V)',d['Currency of Taxes or fees based Cost'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Bill Rate % applied to Cost (X)',d['Taxes or fees based on BILL RATE in %'])}</div>
+    <div class="sec-lbl sec-lbl-rate">Bill Rate</div>
+    <div class="form-row">${reqDetailRow('Rate in local currency (AB)',d['Rate in local currency'])}${reqDetailRow('Currency of Rate (AC)',d['Currency of Rate'])}${reqDetailRow('Frequency Bill Rate (AE)',d['Frequency Bill Rate'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Cost % for Rate (AF)',d['Taxes on Cost % (Rate)'])}${reqDetailRow('Fees Rate $/hr (AG)',d['Fees Rate $/hr'])}${reqDetailRow('Currency of Fees on Rate (AH)',d['Currency of Taxes or fees based Bill Rate'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Rate % (AJ)',d['Taxes or fees based on RATE in %'])}</div>
+    <div class="sec-lbl sec-lbl-time">% Time Assigned</div>
+    <div class="form-row">${reqDetailRow('% time assigned',d['% time assigned - %']?(parseN(d['% time assigned - %'])*100).toFixed(0)+'%':'')}</div>
+    <div class="calc-preview visible" style="margin-top:8px">
+      <div class="calc-row"><span class="calc-label">Total Cost/hr (USD)</span><span class="calc-value">$${fmt(c)}</span></div>
+      <div class="calc-row"><span class="calc-label">Total Rate/hr (USD)</span><span class="calc-value">$${fmt(rt)}</span></div>
+      <div class="calc-row"><span class="calc-label" style="font-weight:700;font-size:14px">Margin (USD/hr)</span><span class="calc-value margin${m<0?' neg':''}">$${fmt(m)}</span></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">${tdcRow?`Using most recent TDC: ${tdcRow['Year']} Week ${tdcRow['Week']}`:'No exchange rate data available — figures assume USD'}</div>
+    <div class="sec-lbl sec-lbl-info" style="margin-top:16px">Additional</div>
+    <div class="form-row"><div style="grid-column:1/-1">${reqDetailRow('Chain of contracting companies',d['Chain of contracting companies'])}</div></div>
+    ${reqDetailRow('Notes',d['Notes'])}
+  `;
+  const approveBtn=$('mreq-approve-btn'),rejectBtn=$('mreq-reject-btn');
+  if(mode==='approve'&&r['Status']==='Pending'){
+    approveBtn.style.display='inline-flex';rejectBtn.style.display='inline-flex';
+    approveBtn.onclick=()=>{closeM('mreq');actOnRequest(requestId,'approve');};
+    rejectBtn.onclick=()=>{closeM('mreq');actOnRequest(requestId,'reject');};
+  }else{
+    approveBtn.style.display='none';rejectBtn.style.display='none';
+  }
+  $('mreq').classList.add('open');
+}
 function renderRequests(){
   $('req-title').textContent=canApprove()?'Requests & Approvals':'My Placement Requests';
   $('req-approvals-wrap').style.display=canApprove()?'block':'none';
@@ -937,15 +1011,15 @@ function renderRequests(){
     const pending=S.requests.filter(r=>r['Status']==='Pending');
     $('tbreqpending').innerHTML=pending.map(r=>{
       const d=r['DataParsed']||{};
-      return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td>${r['RequestedBy']||''}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="actOnRequest('${r['RequestId']}','approve')">Approve</button> <button class="btn btn-danger btn-sm" onclick="actOnRequest('${r['RequestId']}','reject')">Reject</button></td></tr>`;
+      return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td>${r['RequestedBy']||''}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="openReqReview('${r['RequestId']}','approve')">Review</button></td></tr>`;
     }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No pending requests</td></tr>';
   }
   const mine=S.requests.filter(r=>(r['RequestedBy']||'').toLowerCase()===(S.currentUser?.email||'').toLowerCase());
   $('tbreqmine').innerHTML=mine.map(r=>{
     const d=r['DataParsed']||{};
     const statusColor=r['Status']==='Approved'?'var(--accent)':(r['Status']==='Rejected'?'var(--danger)':'var(--muted)');
-    return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="font-weight:600;color:${statusColor}">${r['Status']||''}</td><td style="font-size:12px;color:var(--muted)">${r['ReviewedBy']||'—'}</td></tr>`;
-  }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No requests submitted yet</td></tr>';
+    return`<tr><td style="font-size:12px;color:var(--muted)">${r['Timestamp']||''}</td><td><strong>${d['Consultant Name']||''}</strong></td><td style="font-size:12px;color:var(--muted)">${d['Role']||''}</td><td>${d['Direct client']||''}</td><td>${typeBadge(d['Type']||'')}</td><td>${fmtD(d['Start date']||'')}</td><td style="font-weight:600;color:${statusColor}">${r['Status']||''}</td><td style="font-size:12px;color:var(--muted)">${r['ReviewedBy']||'—'}</td><td><button class="btn btn-secondary btn-sm" onclick="openReqReview('${r['RequestId']}','view')">View</button></td></tr>`;
+  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">No requests submitted yet</td></tr>';
 }
 async function actOnRequest(requestId,type){
   if(type==='reject'){
