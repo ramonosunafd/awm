@@ -556,6 +556,7 @@ const fmt=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximu
 const fmtAWM=n=>{const v=Number(n||0);return v<0?`<span class="awm-neg">($${fmt(Math.abs(v))})</span>`:`<span class="awm-val">$${fmt(v)}</span>`;};
 const fmtAWMLink=(n,onclick)=>{const v=Number(n||0);const cls=v<0?'awm-neg':'awm-link';const disp=v<0?`($${fmt(Math.abs(v))})`:`$${fmt(v)}`;return`<span class="${cls}" onclick="${onclick}">${disp}</span>`;};
 const fmtD=s=>{if(!s)return'—';const p=String(s).split('-');return p.length===3?`${p[1]}/${p[2]}/${p[0]}`:s;};
+const fmtFreq=v=>{const map={'2016':'Annual','168':'Monthly','40':'Weekly','8':'Daily','1':'Hourly'};if(v===undefined||v===null||v==='')return'';return map[String(v)]||String(v);};
 const toast=m=>{const t=$('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2400);};
 const parseN=s=>{if(!s&&s!==0)return 0;const str=String(s).replace(/\$|,|\s/g,'').trim();if(str.startsWith('(')&&str.endsWith(')'))return-parseFloat(str.slice(1,-1))||0;return parseFloat(str)||0;};
 
@@ -846,7 +847,7 @@ function renderPL(){
     const{margin:m,costUSD:c,rateUSD:r}=calcMargin(p,tdcRow);totalMargin+=m;totalCost+=c;totalRate+=r;
     const canCreate=canDirectAddEdit()||canRequest();
     const dupBtn=canCreate?` <button class="btn btn-secondary btn-sm" onclick="duplicatePL('${p['Num']}')">Duplicate</button>`:'';
-    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap">${canDirectAddEdit()?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(S.role==='admin'?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(canRequest()?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button>`:''))}${dupBtn}</td></tr>`;
+    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="viewPL('${p['Num']}')">View</button> ${canDirectAddEdit()?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(S.role==='admin'?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(canRequest()?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button>`:''))}${dupBtn}</td></tr>`;
   }).join('')||'<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:24px">No placements found</td></tr>';
   $('tbpl').innerHTML=rows+`<tr style="background:#f9f9f7;border-top:2px solid var(--border)"><td colspan="9" style="text-align:right;font-weight:600;color:var(--muted);font-size:12px">${list.length} placement${list.length!==1?'s':''} shown</td><td style="color:var(--muted);font-weight:600">$${fmt(totalCost)}</td><td style="color:var(--muted);font-weight:600">$${fmt(totalRate)}</td><td style="font-weight:700">${totalMargin<0?`<span class="awm-neg">($${fmt(Math.abs(totalMargin))})</span>`:`$${fmt(totalMargin)}`}</td><td colspan="3"></td></tr>`;
 }
@@ -980,6 +981,42 @@ function reqDetailRow(label,value){
   if(value===undefined||value===null||value==='')value='—';
   return`<div><label style="margin-bottom:2px">${label}</label><div style="padding:6px 0;font-size:13px;color:var(--text);border-bottom:1px solid var(--border)">${value}</div></div>`;
 }
+function viewPL(num){
+  const p=S.placements.find(x=>String(x['Num'])===String(num));if(!p)return;
+  const tdcRow=getLatestTDCRow();
+  const{margin:m,costUSD:c,rateUSD:rt}=calcMargin(p,tdcRow);
+  $('mreq-title').textContent=`Placement #${p['Num']||''}`;
+  $('mreq-sub').textContent=`${p['Consultant Name']||''} — ${p['Type']||''}`;
+  $('mreq-body').innerHTML=`
+    <div class="sec-lbl sec-lbl-info">Placement Info</div>
+    <div class="form-row">${reqDetailRow('Type',p['Type'])}${reqDetailRow('# Placed',p['Place'])}${reqDetailRow('Consultant',p['Consultant Name'])}</div>
+    <div class="form-row">${reqDetailRow('Role',p['Role'])}${reqDetailRow('Direct client',p['Direct client']||p['Direct Client'])}${reqDetailRow('End client',p['End client']||p['End Client'])}</div>
+    <div class="form-row">${reqDetailRow('Country (direct)',p['Country - Direct client'])}${reqDetailRow('Country (end)',p['Country - End client'])}</div>
+    <div class="form-row">${reqDetailRow('BDM',p['BDM'])}${reqDetailRow('Recruiter',p['Recruiter'])}${reqDetailRow('Admin',p['Admin'])}</div>
+    <div class="form-row">${reqDetailRow('Start date',fmtD(p['Start date']||p['Start']))}${reqDetailRow('End date',fmtD(p['End date']||p['End']))}${reqDetailRow('Length (months)',p['Length in months'])}</div>
+    <div class="sec-lbl sec-lbl-cost">Cost</div>
+    <div class="form-row">${reqDetailRow('Cost in local currency (P)',p['Cost in local currency'])}${reqDetailRow('Currency of Cost (Q)',p['Currency of Cost'])}${reqDetailRow('Frequency Cost (S)',fmtFreq(p['Frequency Cost']))}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Cost % (T)',p['Taxes on Cost %'])}${reqDetailRow('Fees Cost $/hr (U)',p['Fees Cost $/hr'])}${reqDetailRow('Currency of Fees on Cost (V)',p['Currency of Taxes or fees based Cost'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Bill Rate % applied to Cost (X)',p['Taxes or fees based on BILL RATE in %'])}</div>
+    <div class="sec-lbl sec-lbl-rate">Bill Rate</div>
+    <div class="form-row">${reqDetailRow('Rate in local currency (AB)',p['Rate in local currency'])}${reqDetailRow('Currency of Rate (AC)',p['Currency of Rate'])}${reqDetailRow('Frequency Bill Rate (AE)',fmtFreq(p['Frequency Bill Rate']))}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Cost % for Rate (AF)',p['Taxes on Cost % (Rate)'])}${reqDetailRow('Fees Rate $/hr (AG)',p['Fees Rate $/hr'])}${reqDetailRow('Currency of Fees on Rate (AH)',p['Currency of Taxes or fees based Bill Rate'])}</div>
+    <div class="form-row">${reqDetailRow('Taxes on Rate % (AJ)',p['Taxes or fees based on RATE in %'])}</div>
+    <div class="sec-lbl sec-lbl-time">% Time Assigned</div>
+    <div class="form-row">${reqDetailRow('% time assigned',p['% time assigned - %']?(parseN(p['% time assigned - %'])*100).toFixed(0)+'%':'')}</div>
+    <div class="calc-preview visible" style="margin-top:8px">
+      <div class="calc-row"><span class="calc-label">Total Cost/hr (USD)</span><span class="calc-value">$${fmt(c)}</span></div>
+      <div class="calc-row"><span class="calc-label">Total Rate/hr (USD)</span><span class="calc-value">$${fmt(rt)}</span></div>
+      <div class="calc-row"><span class="calc-label" style="font-weight:700;font-size:14px">Margin (USD/hr)</span><span class="calc-value margin${m<0?' neg':''}">$${fmt(m)}</span></div>
+    </div>
+    <div class="sec-lbl sec-lbl-info" style="margin-top:16px">Additional</div>
+    <div class="form-row"><div style="grid-column:1/-1">${reqDetailRow('Chain of contracting companies',p['Chain of contracting companies'])}</div></div>
+    ${reqDetailRow('Notes',p['Notes'])}
+  `;
+  $('mreq-approve-btn').style.display='none';
+  $('mreq-reject-btn').style.display='none';
+  $('mreq').classList.add('open');
+}
 function calcMarginPreviewFromData(data){
   const tdcRow=getLatestTDCRow();
   const P=parseN(data['Cost in local currency']||0),Q=String(data['Currency of Cost']||'USD').trim(),R=getFXRate(Q,tdcRow);
@@ -1033,11 +1070,11 @@ function openReqReview(requestId,mode){
     <div class="form-row">${field('BDM','BDM')}${field('Recruiter','Recruiter')}${field('Admin','Admin')}</div>
     <div class="form-row">${field('Start date','Start date',fmtD)}${field('End date','End date',fmtD)}${field('Length (months)','Length in months')}</div>
     <div class="sec-lbl sec-lbl-cost">Cost</div>
-    <div class="form-row">${field('Cost in local currency (P)','Cost in local currency')}${field('Currency of Cost (Q)','Currency of Cost')}${field('Frequency Cost (S)','Frequency Cost')}</div>
+    <div class="form-row">${field('Cost in local currency (P)','Cost in local currency')}${field('Currency of Cost (Q)','Currency of Cost')}${field('Frequency Cost (S)','Frequency Cost',fmtFreq)}</div>
     <div class="form-row">${field('Taxes on Cost % (T)','Taxes on Cost %')}${field('Fees Cost $/hr (U)','Fees Cost $/hr')}${field('Currency of Fees on Cost (V)','Currency of Taxes or fees based Cost')}</div>
     <div class="form-row">${field('Taxes on Bill Rate % applied to Cost (X)','Taxes or fees based on BILL RATE in %')}</div>
     <div class="sec-lbl sec-lbl-rate">Bill Rate</div>
-    <div class="form-row">${field('Rate in local currency (AB)','Rate in local currency')}${field('Currency of Rate (AC)','Currency of Rate')}${field('Frequency Bill Rate (AE)','Frequency Bill Rate')}</div>
+    <div class="form-row">${field('Rate in local currency (AB)','Rate in local currency')}${field('Currency of Rate (AC)','Currency of Rate')}${field('Frequency Bill Rate (AE)','Frequency Bill Rate',fmtFreq)}</div>
     <div class="form-row">${field('Taxes on Cost % for Rate (AF)','Taxes on Cost % (Rate)')}${field('Fees Rate $/hr (AG)','Fees Rate $/hr')}${field('Currency of Fees on Rate (AH)','Currency of Taxes or fees based Bill Rate')}</div>
     <div class="form-row">${field('Taxes on Rate % (AJ)','Taxes or fees based on RATE in %')}</div>
     <div class="sec-lbl sec-lbl-time">% Time Assigned</div>
