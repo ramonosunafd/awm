@@ -6,6 +6,8 @@
 <title>Fast Dolphin – AWM</title>
 <meta name="google-signin-client_id" content="653571310953-9rrgi92pi29mndk8gdv00ke537ss6ncb.apps.googleusercontent.com">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -251,7 +253,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     </div>
   </div>
   <div class="card" style="padding:0"><div class="tbl-wrap"><table>
-    <thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>End Client</th><th>BDM</th><th>Recruiter</th><th>Start</th><th>End</th><th>Cost/hr USD</th><th>Rate/hr USD</th><th>Margin</th><th>Type</th><th>Chain</th><th></th></tr></thead>
+    <thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Direct Client</th><th>End Client</th><th>BDM</th><th>Recruiter</th><th>Start</th><th>Orig. Start</th><th>End</th><th>Cost/hr USD</th><th>Rate/hr USD</th><th>Margin</th><th>Type</th><th>Chain</th><th></th></tr></thead>
     <tbody id="tbpl"></tbody>
   </table></div></div>
 </div>
@@ -373,6 +375,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     </div>
   </div>
   <div id="rpt-error"></div>
+  <div id="rpt-fxwarn" style="display:none;margin-bottom:16px"></div>
   <div id="rpt-content" style="display:none">
     <div id="rpt-stat-total" style="margin-bottom:16px"></div>
     <div class="grid4" id="rpt-stat-avgs" style="margin-bottom:20px"></div>
@@ -383,6 +386,38 @@ tfoot td{background:#f9f9f7;font-weight:600}
     <div class="card"><h2>Top Clients</h2><div class="tbl-wrap"><table id="rpt-tclients"></table></div></div>
   </div>
   <div id="rpt-empty" style="color:var(--muted);font-size:14px;padding:48px;text-align:center">Select a date range above and click <strong>Generate Report</strong> to view AWM for that period.</div>
+  <div class="card" style="margin-top:24px">
+    <h2>Custom Report — By Employee</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Pick one or more weeks and one or more people (BDM, Recruiter, or Admin) — each person's AWM combines every role they touched, counted once per placement even if they held more than one role on it.</p>
+    <div class="grid2" style="margin-bottom:16px">
+      <div>
+        <label>Weeks</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <select id="crY" style="max-width:110px"></select>
+          <select id="crW" style="max-width:130px"></select>
+          <button class="btn btn-secondary btn-sm" onclick="addCRWeek()">+ Add Week</button>
+        </div>
+        <div class="pill-list" id="crWeeksList"></div>
+      </div>
+      <div>
+        <label>Employees</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <select id="crEmp" style="max-width:220px"></select>
+          <button class="btn btn-secondary btn-sm" onclick="addCREmp()">+ Add Employee</button>
+        </div>
+        <div class="pill-list" id="crEmpList"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="renderCustomReport()">Generate Report</button>
+      <button class="btn btn-secondary" id="cr-dl-csv" disabled onclick="downloadCRCsv()">⬇ CSV</button>
+      <button class="btn btn-secondary" id="cr-dl-xlsx" disabled onclick="downloadCRXlsx()">⬇ XLSX</button>
+      <button class="btn btn-secondary" id="cr-dl-pdf" disabled onclick="downloadCRPdf()">⬇ PDF</button>
+    </div>
+    <div id="cr-error"></div>
+    <div id="cr-fxwarn" style="display:none;margin-bottom:12px"></div>
+    <div id="cr-results"></div>
+  </div>
 </div>
 
 <!-- REPORTING DRILL-DOWN -->
@@ -391,7 +426,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     <div><div style="font-size:16px;font-weight:700" id="rpt-dd-name"></div><div style="font-size:12px;color:var(--muted)" id="rpt-dd-sub"></div></div>
     <button class="btn btn-secondary btn-sm" onclick="closeRptDD()">Close</button>
   </div>
-  <div class="dd-body"><table><thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Client</th><th>Type</th><th>Start</th><th>End</th><th>Cost/hr</th><th>Rate/hr</th><th>Active days</th><th>Avg AWM</th></tr></thead><tbody id="rpt-ddbody"></tbody></table></div>
+  <div class="dd-body"><table><thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Client</th><th>Type</th><th>Start</th><th>Orig. Start</th><th>End</th><th>Cost/hr</th><th>Rate/hr</th><th>Active days</th><th>Avg AWM</th></tr></thead><tbody id="rpt-ddbody"></tbody></table></div>
 </div></div>
 
 <datalist id="dl-names"></datalist>
@@ -427,9 +462,10 @@ tfoot td{background:#f9f9f7;font-weight:600}
     <div><label>Admin</label><select id="fad"><option value="">— none —</option></select></div>
   </div>
   <div class="form-row">
-    <div><label>Start date *</label><input id="fsd" type="date" onchange="calcLength()"></div>
+    <div><label>Start date *</label><input id="fsd" type="date" onchange="calcLength();syncOSD()"></div>
     <div><label>End date</label><input id="fed" type="date" onchange="calcLength()"></div>
     <div><label>Length (months, auto)</label><input id="flm" disabled style="background:#f5f5f3;color:var(--muted)"></div>
+    <div><label id="fosd-label">Original Start Date</label><input id="fosd" type="date"></div>
   </div>
   <div class="sec-lbl sec-lbl-cost">Cost</div>
   <div class="form-row">
@@ -496,7 +532,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
     <div><div style="font-size:16px;font-weight:700" id="dd-name"></div><div style="font-size:12px;color:var(--muted)" id="dd-sub"></div></div>
     <button class="btn btn-secondary btn-sm" onclick="closeDD()">Close</button>
   </div>
-  <div class="dd-body"><table><thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Client</th><th>Type</th><th>Start</th><th>End</th><th>Cost/hr</th><th>Rate/hr</th><th>Active days</th><th>Avg AWM</th></tr></thead><tbody id="ddbody"></tbody></table></div>
+  <div class="dd-body"><table><thead><tr><th>#</th><th>Consultant</th><th>Role</th><th>Client</th><th>Type</th><th>Start</th><th>Orig. Start</th><th>End</th><th>Cost/hr</th><th>Rate/hr</th><th>Active days</th><th>Avg AWM</th></tr></thead><tbody id="ddbody"></tbody></table></div>
 </div></div>
 
 <!-- WEEK-AT-A-GLANCE -->
@@ -520,7 +556,8 @@ const ALLOWED_DOMAIN='fastdolphin.com';
 
 const S={placements:[],tdc:[],requests:[],loaded:false,loading:false,people:{bdm:[],rec:[],adm:[]},
   goals:{s1:199,s2:299,s3:399,r1:89,r2:139,r3:199,t1:1299,t2:1599,t3:1999},
-  editing:null,requestMode:false,resubmitOf:null,editRequestNum:null,currentUser:null,role:'readonly'};
+  editing:null,requestMode:false,resubmitOf:null,editRequestNum:null,osdMode:'auto',currentUser:null,role:'readonly',
+  customWeeks:[],customEmployees:[],customResult:null};
 
 const ROLES={
   'ramon.osuna@fastdolphin.com':'admin',
@@ -767,9 +804,9 @@ function openDD(name,type,placements,week,year){
     const activeDays=workdays.filter(d=>isActiveOn(p,d)).length;if(activeDays===0)return'';
     const{margin:m,costUSD:c,rateUSD:r}=calcMargin(p,tdcRow);const contrib=(m*activeDays)/5;total+=contrib;
     const partial=activeDays<5;
-    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${i+1}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||''}</td><td>${typeBadge(p['Type']||'')}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td><span class="wag-days-chip${partial?' wag-days-partial':''}">${activeDays}/5</span></td><td>${fmtAWM(contrib)}</td></tr>`;
+    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${i+1}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||''}</td><td>${typeBadge(p['Type']||'')}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td style="color:var(--muted)">${fmtD(p['Original Start Date']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td><span class="wag-days-chip${partial?' wag-days-partial':''}">${activeDays}/5</span></td><td>${fmtAWM(contrib)}</td></tr>`;
   }).filter(Boolean).join('');
-  $('ddbody').innerHTML=rows+`<tr style="border-top:2px solid var(--border)"><td colspan="10" style="font-weight:600;text-align:right">Weekly Average Total</td><td>${fmtAWM(total)}</td></tr>`;
+  $('ddbody').innerHTML=rows+`<tr style="border-top:2px solid var(--border)"><td colspan="11" style="font-weight:600;text-align:right">Weekly Average Total</td><td>${fmtAWM(total)}</td></tr>`;
   $('dd').classList.add('open');
 }
 function closeDD(){$('dd').classList.remove('open');}
@@ -847,14 +884,15 @@ function renderPL(){
     const{margin:m,costUSD:c,rateUSD:r}=calcMargin(p,tdcRow);totalMargin+=m;totalCost+=c;totalRate+=r;
     const canCreate=canDirectAddEdit()||canRequest();
     const dupBtn=canCreate?` <button class="btn btn-secondary btn-sm" onclick="duplicatePL('${p['Num']}')">Duplicate</button>`:'';
-    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="viewPL('${p['Num']}')">View</button> ${canDirectAddEdit()?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(S.role==='admin'?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(canRequest()?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button>`:''))}${dupBtn}</td></tr>`;
+    return`<tr class="${isAdj(p)?'adj-row':''}"><td>${p['Num']||''}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||'—'}</td><td>${p['End client']||p['End Client']||'—'}</td><td>${p['BDM']||''}</td><td>${p['Recruiter']||''}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td style="color:var(--muted)">${fmtD(p['Original Start Date']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(c)}</td><td style="color:var(--muted)">$${fmt(r)}</td><td>${fmtAWM(m)}</td><td>${typeBadge(p['Type']||'')}</td><td class="notes-cell" title="${(p['Chain of contracting companies']||'').replace(/"/g,'')}">${p['Chain of contracting companies']||'—'}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="viewPL('${p['Num']}')">View</button> ${canDirectAddEdit()?`<button class="btn btn-secondary btn-sm" onclick="editPL('${p['Num']}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(S.role==='admin'?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button><button class="btn btn-danger btn-sm" onclick="delPL('${p['Num']}')">Del</button>`:(canRequest()?`<button class="btn btn-secondary btn-sm" onclick="openEditRequestPL('${p['Num']}')">Request Edit</button>`:''))}${dupBtn}</td></tr>`;
   }).join('')||'<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:24px">No placements found</td></tr>';
-  $('tbpl').innerHTML=rows+`<tr style="background:#f9f9f7;border-top:2px solid var(--border)"><td colspan="9" style="text-align:right;font-weight:600;color:var(--muted);font-size:12px">${list.length} placement${list.length!==1?'s':''} shown</td><td style="color:var(--muted);font-weight:600">$${fmt(totalCost)}</td><td style="color:var(--muted);font-weight:600">$${fmt(totalRate)}</td><td style="font-weight:700">${totalMargin<0?`<span class="awm-neg">($${fmt(Math.abs(totalMargin))})</span>`:`$${fmt(totalMargin)}`}</td><td colspan="3"></td></tr>`;
+  $('tbpl').innerHTML=rows+`<tr style="background:#f9f9f7;border-top:2px solid var(--border)"><td colspan="10" style="text-align:right;font-weight:600;color:var(--muted);font-size:12px">${list.length} placement${list.length!==1?'s':''} shown</td><td style="color:var(--muted);font-weight:600">$${fmt(totalCost)}</td><td style="color:var(--muted);font-weight:600">$${fmt(totalRate)}</td><td style="font-weight:700">${totalMargin<0?`<span class="awm-neg">($${fmt(Math.abs(totalMargin))})</span>`:`$${fmt(totalMargin)}`}</td><td colspan="3"></td></tr>`;
 }
 
 // ── PLACEMENT FORM ────────────────────────────────────────────────────────────
 function toggleCountryOther(selId,inputId){$(inputId).style.display=$(selId).value==='Other'?'block':'none';if($(selId).value!=='Other')$(inputId).value='';}
 function calcLength(){const s=$('fsd').value,e=$('fed').value;if(s&&e){const ms=new Date(e)-new Date(s);const months=ms/(1000*60*60*24*30.44);$('flm').value=months>0?months.toFixed(1):''; }else{$('flm').value='';}}
+function syncOSD(){if(S.osdMode==='auto'){$('fosd').value=$('fsd').value;}}
 function getCountryVal(selId,inputId){return $(selId).value==='Other'?$(inputId).value.trim()||'Other':$(selId).value;}
 function setCountryVal(selId,inputId,val){const opts=['USA','Mexico','Brazil','Canada','Colombia','Argentina','UK','Other'];if(opts.includes(val)){$(selId).value=val;$(inputId).style.display='none';$(inputId).value='';}else{$(selId).value='Other';$(inputId).style.display='block';$(inputId).value=val;}}
 function toggleAOInput(){const val=$('fAO_type').value;$('fAO_other_wrap').style.display=val==='other'?'block':'none';if(val!=='other')$('fAO_other').value='';}
@@ -878,6 +916,12 @@ function openPL(existing,requestMode,editRequestNum,isDuplicate){
   S.editRequestNum=editRequestNum||null;
   S.editing=(existing&&!S.requestMode)?existing['Num']:null;
   const isEditReq=!!S.editRequestNum;
+  S.osdMode=isEditReq?'editable':(isDuplicate?'locked-source':'auto');
+  const fosd=$('fosd');
+  fosd.disabled=S.osdMode!=='editable';
+  fosd.style.background=S.osdMode!=='editable'?'#f5f5f3':'';
+  fosd.style.color=S.osdMode!=='editable'?'var(--muted)':'';
+  $('fosd-label').textContent=S.osdMode==='locked-source'?'Original Start Date (locked — carried from source)':(S.osdMode==='auto'?'Original Start Date (= Start date)':'Original Start Date');
   $('mpl-title').textContent=isEditReq?`Request Edit — Placement #${S.editRequestNum}`:(isDuplicate?'Duplicate Placement':(S.requestMode?(existing?'Amend & Resubmit Request':'Submit Placement for Approval'):(existing?'Edit Placement':'New Placement')));
   $('mpl-sub').textContent=isEditReq?'These changes will go to Carlos or Ramon for approval before updating the Google Sheet.':(isDuplicate?'Prefilled from the original placement — update whatever changed (e.g. dates, rates) before saving.':(S.requestMode?'This will go to Carlos or Ramon for approval before it appears in the Google Sheet.':(existing?`Placement #${existing['Num']} — ${existing['Consultant Name']||''}`:'Fill in the details below. Use Calculate Preview before saving.')));
   const saveBtn=$('mpl-save-btn');
@@ -895,6 +939,7 @@ function openPL(existing,requestMode,editRequestNum,isDuplicate){
     setCountryVal('fcdc','fcdc-other',existing['Country - Direct client']||'USA');setCountryVal('fcec','fcec-other',existing['Country - End client']||'USA');
     bd.value=existing['BDM']||'';re.value=existing['Recruiter']||'';ad.value=existing['Admin']||'';
     $('fsd').value=existing['Start date']||existing['Start']||'';$('fed').value=existing['End date']||existing['End']||'';calcLength();
+    $('fosd').value=S.osdMode==='auto'?$('fsd').value:(existing['Original Start Date']||existing['Start date']||existing['Start']||'');
     $('fP').value=existing['Cost in local currency']||'';$('fQ').value=existing['Currency of Cost']||'';$('fS').value=existing['Frequency Cost']||'';
     $('fT').value=existing['Taxes on Cost %']||0;$('fU').value=existing['Fees Cost $/hr']||0;$('fV').value=existing['Currency of Taxes or fees based Cost']||'';
     $('fX').value=existing['Taxes or fees based on BILL RATE in %']||0;$('fAB').value=existing['Rate in local currency']||'';$('fAC').value=existing['Currency of Rate']||'';
@@ -906,7 +951,7 @@ function openPL(existing,requestMode,editRequestNum,isDuplicate){
   }else{
     $('fi').value='Auto-assigned';['fn','fr','fdc','fec','fch','fno','fP','fAB'].forEach(id=>$(id).value='');
     ['fQ','fS','fV','fAC','fAE','fAH'].forEach(id=>$(id).value='');['fT','fU','fX','fAF','fAG','fAJ'].forEach(id=>$(id).value='0');
-    $('fp').value=1;$('fsd').value='';$('fed').value='';$('flm').value='';
+    $('fp').value=1;$('fsd').value='';$('fed').value='';$('flm').value='';$('fosd').value='';
     setCountryVal('fcdc','fcdc-other','USA');setCountryVal('fcec','fcec-other','USA');$('fAO_type').value='1';toggleAOInput();onTypeChange();
   }
   $('mpl').classList.add('open');
@@ -946,7 +991,7 @@ async function savePL(){
   const name=$('fn').value.trim(),role=$('fr').value.trim(),dc=$('fdc').value.trim();
   const bdm=$('fbd').value,rec=$('fre').value,start=$('fsd').value;
   if(!name||!role||!dc||!bdm||!rec||!start){alert('Fill all required fields (*)');return;}
-  const data={...(S.editing?{'Num':S.editing}:{}),'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
+  const data={...(S.editing?{'Num':S.editing}:{}),'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Original Start Date':$('fosd').value||start,'Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
   toast(S.editing?'Updating…':'Saving…');
   const res=await apiPost({action:S.editing?'updatePlacement':'addPlacement',data});
   if(res.error){toast('Error: '+res.error);return;}
@@ -958,7 +1003,7 @@ async function submitPL(){
   const name=$('fn').value.trim(),role=$('fr').value.trim(),dc=$('fdc').value.trim();
   const bdm=$('fbd').value,rec=$('fre').value,start=$('fsd').value;
   if(!name||!role||!dc||!bdm||!rec||!start){alert('Fill all required fields (*)');return;}
-  const data={...(S.editRequestNum?{'Num':S.editRequestNum}:{}),'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
+  const data={...(S.editRequestNum?{'Num':S.editRequestNum}:{}),'Place':+$('fp').value||1,'Type':$('ft').value,'Consultant Name':name,'Role':role,'Direct client':dc,'End client':$('fec').value.trim(),'Country - Direct client':getCountryVal('fcdc','fcdc-other'),'Country - End client':getCountryVal('fcec','fcec-other'),'BDM':bdm,'Recruiter':rec,'Admin':$('fad').value,'Start date':start,'End date':$('fed').value||'','Original Start Date':$('fosd').value||start,'Length in months':parseFloat($('flm').value)||'','Cost in local currency':parseN($('fP').value),'Currency of Cost':$('fQ').value,'Frequency Cost':parseN($('fS').value),'Taxes on Cost %':parseN($('fT').value),'Fees Cost $/hr':parseN($('fU').value),'Currency of Taxes or fees based Cost':$('fV').value,'Taxes or fees based on BILL RATE in %':parseN($('fX').value),'Rate in local currency':parseN($('fAB').value),'Currency of Rate':$('fAC').value,'Frequency Bill Rate':parseN($('fAE').value),'Taxes on Cost % (Rate)':parseN($('fAF').value),'Fees Rate $/hr':parseN($('fAG').value),'Currency of Taxes or fees based Bill Rate':$('fAH').value,'Taxes or fees based on RATE in %':parseN($('fAJ').value),'% time assigned - %':getAOValue(),'Chain of contracting companies':$('fch').value.trim(),'Notes':$('fno').value.trim()};
   const isEditReq=!!S.editRequestNum;
   toast(isEditReq?'Submitting edit for approval…':'Submitting for approval…');
   const res=await apiPost({action:'submitPlacementRequest',data,amendsRequestId:S.resubmitOf||'',requestType:isEditReq?'edit':'add'});
@@ -994,6 +1039,7 @@ function viewPL(num){
     <div class="form-row">${reqDetailRow('Country (direct)',p['Country - Direct client'])}${reqDetailRow('Country (end)',p['Country - End client'])}</div>
     <div class="form-row">${reqDetailRow('BDM',p['BDM'])}${reqDetailRow('Recruiter',p['Recruiter'])}${reqDetailRow('Admin',p['Admin'])}</div>
     <div class="form-row">${reqDetailRow('Start date',fmtD(p['Start date']||p['Start']))}${reqDetailRow('End date',fmtD(p['End date']||p['End']))}${reqDetailRow('Length (months)',p['Length in months'])}</div>
+    <div class="form-row">${reqDetailRow('Original Start Date',fmtD(p['Original Start Date']))}</div>
     <div class="sec-lbl sec-lbl-cost">Cost</div>
     <div class="form-row">${reqDetailRow('Cost in local currency (P)',p['Cost in local currency'])}${reqDetailRow('Currency of Cost (Q)',p['Currency of Cost'])}${reqDetailRow('Frequency Cost (S)',fmtFreq(p['Frequency Cost']))}</div>
     <div class="form-row">${reqDetailRow('Taxes on Cost % (T)',p['Taxes on Cost %'])}${reqDetailRow('Fees Cost $/hr (U)',p['Fees Cost $/hr'])}${reqDetailRow('Currency of Fees on Cost (V)',p['Currency of Taxes or fees based Cost'])}</div>
@@ -1069,6 +1115,7 @@ function openReqReview(requestId,mode){
     <div class="form-row">${field('Country (direct)','Country - Direct client')}${field('Country (end)','Country - End client')}</div>
     <div class="form-row">${field('BDM','BDM')}${field('Recruiter','Recruiter')}${field('Admin','Admin')}</div>
     <div class="form-row">${field('Start date','Start date',fmtD)}${field('End date','End date',fmtD)}${field('Length (months)','Length in months')}</div>
+    <div class="form-row">${field('Original Start Date','Original Start Date',fmtD)}</div>
     <div class="sec-lbl sec-lbl-cost">Cost</div>
     <div class="form-row">${field('Cost in local currency (P)','Cost in local currency')}${field('Currency of Cost (Q)','Currency of Cost')}${field('Frequency Cost (S)','Frequency Cost',fmtFreq)}</div>
     <div class="form-row">${field('Taxes on Cost % (T)','Taxes on Cost %')}${field('Fees Cost $/hr (U)','Fees Cost $/hr')}${field('Currency of Fees on Cost (V)','Currency of Taxes or fees based Cost')}</div>
@@ -1193,7 +1240,7 @@ function groupDaysByWeek(workdays){
   const map={};
   workdays.forEach(d=>{
     const dt=new Date(d+'T00:00:00');const y=dt.getFullYear();
-    for(let w=1;w<=53;w++){const sun=weekStart(y,w);const mon=addDays(sun,1),fri=addDays(sun,5);const monStr=dStr(mon),friStr=dStr(fri);if(d>=monStr&&d<=friStr){const key=`${y}-W${String(w).padStart(2,'0')}`;if(!map[key])map[key]={year:y,week:w,tdcRow:getTDCRow(y,w),days:[]};map[key].days.push(d);break;}}
+    for(let w=1;w<=53;w++){const sun=weekStart(y,w);const mon=addDays(sun,1),fri=addDays(sun,5);const monStr=dStr(mon),friStr=dStr(fri);if(d>=monStr&&d<=friStr){const key=`${y}-W${String(w).padStart(2,'0')}`;if(!map[key]){const exact=getTDCRow(y,w);map[key]={year:y,week:w,tdcRow:exact||getLatestTDCRow(),tdcExact:!!exact,days:[]};}map[key].days.push(d);break;}}
   });
   return map;
 }
@@ -1201,6 +1248,7 @@ const RptDDStore={};
 function computeReport(fromStr,toStr){
   const allWorkdays=getWorkdaysInRange(fromStr,toStr);const totalWorkdays=allWorkdays.length;if(totalWorkdays===0)return null;
   const weekMap=groupDaysByWeek(allWorkdays);const byBDM={},byRec={},byClient={};
+  const missingTdcWeeks=Object.values(weekMap).filter(w=>!w.tdcExact).map(w=>({year:w.year,week:w.week,usedRow:w.tdcRow}));
   let total=0,cnt=0,adjCnt=0,contractTotal=0,contractCnt=0,passthruTotal=0,passthruCnt=0,permTotal=0,permCnt=0;
   const placeAcc={};
   Object.values(weekMap).forEach(({year,week,tdcRow,days})=>{
@@ -1219,18 +1267,30 @@ function computeReport(fromStr,toStr){
     const rec=p['Recruiter']||'Unknown';if(!byRec[rec])byRec[rec]={awm:0,n:0,ps:[]};byRec[rec].awm+=contrib;if(!adj)byRec[rec].n++;if(!byRec[rec].ps.find(x=>(x['Num']||x['Consultant Name'])===(p['Num']||p['Consultant Name'])))byRec[rec].ps.push(p);
     const cl=p['Direct client']||p['Direct Client']||'Unknown';if(!byClient[cl])byClient[cl]={awm:0,n:0,ps:[]};byClient[cl].awm+=contrib;if(!adj)byClient[cl].n++;if(!byClient[cl].ps.find(x=>(x['Num']||x['Consultant Name'])===(p['Num']||p['Consultant Name'])))byClient[cl].ps.push(p);
   });
-  return{total,cnt,adjCnt,byBDM,byRec,byClient,totalWorkdays,placeAcc,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt};
+  return{total,cnt,adjCnt,byBDM,byRec,byClient,totalWorkdays,placeAcc,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt,missingTdcWeeks};
 }
 function renderReport(){
   if(!S.loaded){loadData().then(renderReport);return;}
+  fillCREmpSelect();renderCRWeeksList();renderCREmpList();
   const fromStr=$('rpt-from').value,toStr=$('rpt-to').value;
   $('rpt-error').innerHTML='';
+  $('rpt-fxwarn').style.display='none';
   if(!fromStr||!toStr){$('rpt-error').innerHTML='<div class="alert-warn">Please select both a start and end date.</div>';return;}
   if(fromStr>toStr){$('rpt-error').innerHTML='<div class="alert-warn">Start date must be before end date.</div>';return;}
   const result=computeReport(fromStr,toStr);
   if(!result||result.totalWorkdays===0){$('rpt-content').style.display='none';$('rpt-empty').textContent='No workdays found in the selected range.';$('rpt-empty').style.display='block';return;}
   $('rpt-empty').style.display='none';$('rpt-content').style.display='block';
-  const{total,cnt,adjCnt,byBDM,byRec,byClient,totalWorkdays,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt}=result;const g=S.goals;
+  const{total,cnt,adjCnt,byBDM,byRec,byClient,totalWorkdays,contractTotal,contractCnt,passthruTotal,passthruCnt,permTotal,permCnt,missingTdcWeeks}=result;const g=S.goals;
+  if(missingTdcWeeks&&missingTdcWeeks.length){
+    const items=missingTdcWeeks.map(w=>{
+      const used=w.usedRow?`Week ${w.usedRow['Week']}, ${w.usedRow['Year']} rates`:'no exchange rate data at all — non-USD figures below are unreliable';
+      return`Week ${w.week}, ${w.year} (estimated using ${used})`;
+    }).join('; ');
+    $('rpt-fxwarn').innerHTML=`<div class="alert-warn">⚠ Missing exchange rates for: ${items}. Add the missing week(s) to the TDC tab for exact figures.</div>`;
+    $('rpt-fxwarn').style.display='block';
+  }else{
+    $('rpt-fxwarn').style.display='none';
+  }
   const fmtDS=s=>{const p=s.split('-');return`${p[1]}/${p[2]}/${p[0]}`;};
   $('rpt-stat-total').innerHTML=`<div class="stat"><div class="lbl">Total AWM — ${fmtDS(fromStr)} – ${fmtDS(toStr)} · ${totalWorkdays} workdays</div><div class="val" style="font-size:36px;color:${total<0?'var(--danger)':'var(--text)'}">$${fmt(total)}</div>${tlLegend(total,g.t1,g.t2,g.t3)}</div>`;
   const mc=(lbl,val,sub)=>`<div class="mini-stat"><div class="lbl">${lbl}</div><div class="val">$${fmt(val)}</div><div style="font-size:11px;color:var(--muted)">${sub}</div></div>`;
@@ -1252,11 +1312,138 @@ function openRptDD(key){
   const placeAcc={};
   Object.values(weekMap).forEach(({tdcRow,days})=>{ps.forEach(p=>{const activeDaysHere=days.filter(d=>isActiveOn(p,d));if(activeDaysHere.length===0)return;const{margin:m,costUSD:c,rateUSD:r}=calcMargin(p,tdcRow);const contrib=(m*activeDaysHere.length)/totalWorkdays;const num=String(p['Num']||p['Consultant Name']||'');if(!placeAcc[num])placeAcc[num]={p,totalActiveDays:0,contrib:0,costUSD:c,rateUSD:r};placeAcc[num].totalActiveDays+=activeDaysHere.length;placeAcc[num].contrib+=contrib;});});
   let grandTotal=0;
-  const rows=Object.values(placeAcc).filter(({totalActiveDays})=>totalActiveDays>0).sort((a,b)=>b.contrib-a.contrib).map(({p,totalActiveDays,contrib,costUSD,rateUSD},i)=>{grandTotal+=contrib;const partial=totalActiveDays<totalWorkdays;return`<tr class="${isAdj(p)?'adj-row':''}"><td>${i+1}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||''}</td><td>${typeBadge(p['Type']||'')}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(costUSD)}</td><td style="color:var(--muted)">$${fmt(rateUSD)}</td><td><span class="wag-days-chip${partial?' wag-days-partial':''}">${totalActiveDays}/${totalWorkdays}</span></td><td>${fmtAWM(contrib)}</td></tr>`;}).join('');
-  $('rpt-ddbody').innerHTML=rows+`<tr style="border-top:2px solid var(--border)"><td colspan="10" style="font-weight:600;text-align:right">Period Average Total</td><td>${fmtAWM(grandTotal)}</td></tr>`;
+  const rows=Object.values(placeAcc).filter(({totalActiveDays})=>totalActiveDays>0).sort((a,b)=>b.contrib-a.contrib).map(({p,totalActiveDays,contrib,costUSD,rateUSD},i)=>{grandTotal+=contrib;const partial=totalActiveDays<totalWorkdays;return`<tr class="${isAdj(p)?'adj-row':''}"><td>${i+1}</td><td><strong>${p['Consultant Name']||''}</strong></td><td style="color:var(--muted);font-size:12px">${p['Role']||''}</td><td>${p['Direct client']||p['Direct Client']||''}</td><td>${typeBadge(p['Type']||'')}</td><td>${fmtD(p['Start date']||p['Start']||'')}</td><td style="color:var(--muted)">${fmtD(p['Original Start Date']||'')}</td><td>${fmtD(p['End date']||p['End']||'')}</td><td style="color:var(--muted)">$${fmt(costUSD)}</td><td style="color:var(--muted)">$${fmt(rateUSD)}</td><td><span class="wag-days-chip${partial?' wag-days-partial':''}">${totalActiveDays}/${totalWorkdays}</span></td><td>${fmtAWM(contrib)}</td></tr>`;}).join('');
+  $('rpt-ddbody').innerHTML=rows+`<tr style="border-top:2px solid var(--border)"><td colspan="11" style="font-weight:600;text-align:right">Period Average Total</td><td>${fmtAWM(grandTotal)}</td></tr>`;
   $('rpt-dd').classList.add('open');
 }
 function closeRptDD(){$('rpt-dd').classList.remove('open');}
+
+// ── CUSTOM REPORT BY EMPLOYEE ────────────────────────────────────────────────
+function getCombinedPeopleList(){
+  return[...new Set([...S.people.bdm,...S.people.rec,...S.people.adm])].filter(Boolean).sort();
+}
+function fillCREmpSelect(){
+  const combined=getCombinedPeopleList();
+  const sel=$('crEmp');const current=sel.value;
+  sel.innerHTML=combined.map(n=>`<option>${n}</option>`).join('');
+  if(combined.includes(current))sel.value=current;
+}
+function renderCRWeeksList(){
+  $('crWeeksList').innerHTML=S.customWeeks.map((w,i)=>`<span class="pill">Wk ${w.week}, ${w.year}<span class="del" onclick="removeCRWeek(${i})">×</span></span>`).join('')||'<span style="font-size:12px;color:var(--muted)">No weeks added yet</span>';
+}
+function renderCREmpList(){
+  $('crEmpList').innerHTML=S.customEmployees.map((n,i)=>`<span class="pill">${n}<span class="del" onclick="removeCREmp(${i})">×</span></span>`).join('')||'<span style="font-size:12px;color:var(--muted)">No employees added yet</span>';
+}
+function addCRWeek(){
+  const y=+$('crY').value,w=+$('crW').value;
+  if(S.customWeeks.some(x=>x.year===y&&x.week===w)){toast('Week already added');return;}
+  S.customWeeks.push({year:y,week:w});renderCRWeeksList();
+}
+function removeCRWeek(i){S.customWeeks.splice(i,1);renderCRWeeksList();}
+function addCREmp(){
+  const n=$('crEmp').value;if(!n)return;
+  if(S.customEmployees.includes(n)){toast('Already added');return;}
+  S.customEmployees.push(n);renderCREmpList();
+}
+function removeCREmp(i){S.customEmployees.splice(i,1);renderCREmpList();}
+
+function computeCustomReport(weeks,employees){
+  const empSet=new Set(employees);
+  const acc={};employees.forEach(e=>acc[e]={awm:0,placements:new Set()});
+  const missingTdcWeeks=[];
+  weeks.forEach(({year,week})=>{
+    const exact=getTDCRow(year,week);const tdcRow=exact||getLatestTDCRow();
+    if(!exact)missingTdcWeeks.push({year,week,usedRow:tdcRow});
+    const workdays=getWorkdays(year,week);
+    S.placements.forEach(p=>{
+      const activeDays=workdays.filter(d=>isActiveOn(p,d)).length;if(activeDays===0)return;
+      const roles=[p['BDM'],p['Recruiter'],p['Admin']].filter(Boolean);
+      const matched=[...new Set(roles.filter(r=>empSet.has(r)))];
+      if(matched.length===0)return;
+      const{margin:m}=calcMargin(p,tdcRow);const contrib=(m*activeDays)/5;
+      const num=p['Num']||p['Consultant Name'];
+      matched.forEach(name=>{acc[name].awm+=contrib;acc[name].placements.add(num);});
+    });
+  });
+  const rows=employees.map(name=>({name,awm:acc[name].awm,count:acc[name].placements.size})).sort((a,b)=>b.awm-a.awm);
+  return{rows,missingTdcWeeks};
+}
+function renderCustomReport(){
+  fillCREmpSelect();renderCRWeeksList();renderCREmpList();
+  $('cr-error').innerHTML='';$('cr-fxwarn').style.display='none';
+  if(!S.customWeeks.length||!S.customEmployees.length){
+    $('cr-error').innerHTML='<div class="alert-warn">Add at least one week and one employee first.</div>';
+    $('cr-results').innerHTML='';S.customResult=null;
+    ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=true);
+    return;
+  }
+  const{rows,missingTdcWeeks}=computeCustomReport(S.customWeeks,S.customEmployees);
+  if(missingTdcWeeks.length){
+    const items=missingTdcWeeks.map(w=>{const used=w.usedRow?`Week ${w.usedRow['Week']}, ${w.usedRow['Year']} rates`:'no exchange rate data at all — non-USD figures below are unreliable';return`Week ${w.week}, ${w.year} (estimated using ${used})`;}).join('; ');
+    $('cr-fxwarn').innerHTML=`<div class="alert-warn">⚠ Missing exchange rates for: ${items}.</div>`;
+    $('cr-fxwarn').style.display='block';
+  }
+  const weeksLabel=S.customWeeks.map(w=>`Wk${w.week}/${w.year}`).join(', ');
+  S.customResult={rows,weeksLabel};
+  const totalAwm=rows.reduce((s,r)=>s+r.awm,0);
+  const tblRows=rows.map(r=>`<tr><td>${r.name}</td><td>${r.count}</td><td>${fmtAWM(r.awm)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:16px">No matching activity for the selected weeks/employees</td></tr>';
+  $('cr-results').innerHTML=`
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Weeks included: ${weeksLabel}</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Employee</th><th># Placements</th><th>Total AWM</th></tr></thead>
+      <tbody>${tblRows}</tbody>
+      <tfoot><tr><td colspan="2" style="font-weight:600">Total</td><td style="font-weight:700">${fmtAWM(totalAwm)}</td></tr></tfoot>
+    </table></div>`;
+  ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=!rows.length);
+}
+function crExportRows(){
+  if(!S.customResult)return null;
+  const header=['Employee','Distinct Placements','Total AWM (USD)','Weeks Included'];
+  const rows=S.customResult.rows.map(r=>[r.name,r.count,Number(r.awm.toFixed(2)),S.customResult.weeksLabel]);
+  return[header,...rows];
+}
+function csvEscape(v){const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function downloadCRCsv(){
+  const data=crExportRows();if(!data){toast('Generate the report first');return;}
+  const csv=data.map(row=>row.map(csvEscape).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`AWM_Custom_Report_${dStr(new Date())}.csv`;document.body.appendChild(a);a.click();a.remove();
+  URL.revokeObjectURL(url);
+}
+function downloadCRXlsx(){
+  const data=crExportRows();if(!data){toast('Generate the report first');return;}
+  if(typeof XLSX==='undefined'){toast('Excel export library failed to load — check your internet connection and reload');return;}
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'AWM Report');
+  XLSX.writeFile(wb,`AWM_Custom_Report_${dStr(new Date())}.xlsx`);
+}
+function downloadCRPdf(){
+  if(!S.customResult){toast('Generate the report first');return;}
+  if(typeof window.jspdf==='undefined'){toast('PDF export library failed to load — check your internet connection and reload');return;}
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF();
+  doc.setFontSize(14);doc.text('AWM Custom Report',14,16);
+  doc.setFontSize(9);doc.setTextColor(100);
+  doc.text(`Weeks included: ${S.customResult.weeksLabel}`,14,23);
+  doc.text(`Generated: ${dStr(new Date())}`,14,28);
+  doc.setTextColor(0);
+  let y=38;
+  doc.setFontSize(10);doc.setFont(undefined,'bold');
+  doc.text('Employee',14,y);doc.text('# Placements',110,y);doc.text('Total AWM (USD)',155,y);
+  doc.setFont(undefined,'normal');
+  doc.line(14,y+2,196,y+2);
+  y+=8;
+  S.customResult.rows.forEach(r=>{
+    if(y>280){doc.addPage();y=20;}
+    doc.text(String(r.name),14,y);
+    doc.text(String(r.count),110,y);
+    doc.text(`$${fmt(r.awm)}`,155,y);
+    y+=7;
+  });
+  doc.save(`AWM_Custom_Report_${dStr(new Date())}.pdf`);
+}
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 function renderConfig(){
@@ -1275,6 +1462,7 @@ const _firstSun=new Date(_curYear,0,1+(_jan1.getDay()===0?0:7-_jan1.getDay()));
 const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000))+1);
 fillYW($('dy'),$('dw'),_curYear,_curWeek);
 fillYW($('fxy'),$('fxw'),_curYear,_curWeek);
+fillYW($('crY'),$('crW'),_curYear,_curWeek);
 (()=>{const sun=weekStart(_curYear,_curWeek);$('fxrange').textContent=`${fmtD(dStr(sun))} – ${fmtD(dStr(addDays(sun,6)))}`;})();
 </script>
 </body>
