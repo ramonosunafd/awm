@@ -1348,7 +1348,9 @@ function renderCREmpList(){
 function addCRWeek(){
   const y=+$('crY').value,w=+$('crW').value;
   if(S.customWeeks.some(x=>x.year===y&&x.week===w)){toast('Week already added');return;}
-  S.customWeeks.push({year:y,week:w});renderCRWeeksList();
+  S.customWeeks.push({year:y,week:w});
+  S.customWeeks.sort((a,b)=>a.year!==b.year?a.year-b.year:a.week-b.week);
+  renderCRWeeksList();
 }
 function removeCRWeek(i){S.customWeeks.splice(i,1);renderCRWeeksList();}
 function addCREmp(){
@@ -1359,10 +1361,13 @@ function addCREmp(){
 function removeCREmp(i){S.customEmployees.splice(i,1);renderCREmpList();}
 
 function computeCustomReport(weeks,employees){
+  const sortedWeeks=[...weeks].sort((a,b)=>a.year!==b.year?a.year-b.year:a.week-b.week);
   const empSet=new Set(employees);
-  const acc={};employees.forEach(e=>acc[e]={awm:0,placements:new Set()});
+  const acc={};employees.forEach(e=>acc[e]={byWeek:{},placements:new Set()});
   const missingTdcWeeks=[];
-  weeks.forEach(({year,week})=>{
+  sortedWeeks.forEach(({year,week})=>{
+    const key=`${year}-W${week}`;
+    employees.forEach(e=>{if(acc[e].byWeek[key]===undefined)acc[e].byWeek[key]=0;});
     const exact=getTDCRow(year,week);const tdcRow=exact||getLatestTDCRow();
     if(!exact)missingTdcWeeks.push({year,week,usedRow:tdcRow});
     const workdays=getWorkdays(year,week);
@@ -1373,12 +1378,16 @@ function computeCustomReport(weeks,employees){
       if(matched.length===0)return;
       const{margin:m}=calcMargin(p,tdcRow);const contrib=(m*activeDays)/5;
       const num=p['Num']||p['Consultant Name'];
-      matched.forEach(name=>{acc[name].awm+=contrib;acc[name].placements.add(num);});
+      matched.forEach(name=>{acc[name].byWeek[key]=(acc[name].byWeek[key]||0)+contrib;acc[name].placements.add(num);});
     });
   });
-  const wkCount=weeks.length||1;
-  const rows=employees.map(name=>({name,awm:acc[name].awm/wkCount,count:acc[name].placements.size})).sort((a,b)=>b.awm-a.awm);
-  return{rows,missingTdcWeeks};
+  const wkCount=sortedWeeks.length||1;
+  const rows=employees.map(name=>{
+    const byWeek=sortedWeeks.map(({year,week})=>({year,week,awm:acc[name].byWeek[`${year}-W${week}`]||0}));
+    const sum=byWeek.reduce((s,w)=>s+w.awm,0);
+    return{name,byWeek,avg:sum/wkCount,count:acc[name].placements.size};
+  }).sort((a,b)=>b.avg-a.avg);
+  return{rows,missingTdcWeeks,weeks:sortedWeeks};
 }
 function renderCustomReport(){
   fillCREmpSelect();renderCRWeeksList();renderCREmpList();
@@ -1389,30 +1398,35 @@ function renderCustomReport(){
     ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=true);
     return;
   }
-  const{rows,missingTdcWeeks}=computeCustomReport(S.customWeeks,S.customEmployees);
+  const{rows,missingTdcWeeks,weeks}=computeCustomReport(S.customWeeks,S.customEmployees);
   if(missingTdcWeeks.length){
     const items=missingTdcWeeks.map(w=>{const used=w.usedRow?`Week ${w.usedRow['Week']}, ${w.usedRow['Year']} rates`:'no exchange rate data at all — non-USD figures below are unreliable';return`Week ${w.week}, ${w.year} (estimated using ${used})`;}).join('; ');
     $('cr-fxwarn').innerHTML=`<div class="alert-warn">⚠ Missing exchange rates for: ${items}.</div>`;
     $('cr-fxwarn').style.display='block';
   }
-  const weeksLabel=S.customWeeks.map(w=>`Wk${w.week}/${w.year}`).join(', ');
-  S.customResult={rows,weeksLabel};
-  const totalAwm=rows.reduce((s,r)=>s+r.awm,0);
-  const tblRows=rows.map(r=>`<tr><td>${r.name}</td><td>${r.count}</td><td>${fmtAWM(r.awm)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:16px">No matching activity for the selected weeks/employees</td></tr>';
+  const weeksLabel=weeks.map(w=>`Wk${w.week}/${w.year}`).join(', ');
+  S.customResult={rows,weeks,weeksLabel};
+  const weekHeaders=weeks.map(w=>`<th>Wk ${w.week}</th>`).join('');
+  const tblRows=rows.map(r=>{
+    const weekCells=r.byWeek.map(w=>`<td>${fmtAWM(w.awm)}</td>`).join('');
+    return`<tr><td><strong>${r.name}</strong></td>${weekCells}<td style="font-weight:700;border-left:2px solid var(--border)">${fmtAWM(r.avg)}</td><td style="color:var(--muted)">${r.count}</td></tr>`;
+  }).join('')||`<tr><td colspan="${weeks.length+3}" style="text-align:center;color:var(--muted);padding:16px">No matching activity for the selected weeks/employees</td></tr>`;
+  const totalAvg=rows.reduce((s,r)=>s+r.avg,0);
   $('cr-results').innerHTML=`
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Weeks included: ${weeksLabel}</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Weeks included (sequential): ${weeksLabel}</p>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Employee</th><th># Placements</th><th>Total AWM</th></tr></thead>
+      <thead><tr><th>Employee</th>${weekHeaders}<th style="border-left:2px solid var(--border)">Average</th><th># Placements</th></tr></thead>
       <tbody>${tblRows}</tbody>
-      <tfoot><tr><td colspan="2" style="font-weight:600">Total</td><td style="font-weight:700">${fmtAWM(totalAwm)}</td></tr></tfoot>
+      <tfoot><tr><td style="font-weight:600">Total</td><td colspan="${weeks.length}"></td><td style="font-weight:700;border-left:2px solid var(--border)">${fmtAWM(totalAvg)}</td><td></td></tr></tfoot>
     </table></div>`;
   ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=!rows.length);
 }
 function crExportRows(){
   if(!S.customResult)return null;
-  const header=['Employee','Distinct Placements','Total AWM (USD)','Weeks Included'];
-  const rows=S.customResult.rows.map(r=>[r.name,r.count,Number(r.awm.toFixed(2)),S.customResult.weeksLabel]);
-  return[header,...rows];
+  const{rows,weeks}=S.customResult;
+  const header=['Employee',...weeks.map(w=>`Wk${w.week}/${w.year}`),'Average AWM (USD)','Distinct Placements'];
+  const dataRows=rows.map(r=>[r.name,...r.byWeek.map(w=>Number(w.awm.toFixed(2))),Number(r.avg.toFixed(2)),r.count]);
+  return[header,...dataRows];
 }
 function csvEscape(v){const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCRCsv(){
@@ -1435,24 +1449,24 @@ function downloadCRPdf(){
   if(!S.customResult){toast('Generate the report first');return;}
   if(typeof window.jspdf==='undefined'){toast('PDF export library failed to load — check your internet connection and reload');return;}
   const{jsPDF}=window.jspdf;
-  const doc=new jsPDF();
-  doc.setFontSize(14);doc.text('AWM Custom Report',14,16);
+  const doc=new jsPDF({orientation:'landscape'});
+  const data=crExportRows();const header=data[0],body=data.slice(1);
+  doc.setFontSize(14);doc.text('AWM Custom Report',14,14);
   doc.setFontSize(9);doc.setTextColor(100);
-  doc.text(`Weeks included: ${S.customResult.weeksLabel}`,14,23);
-  doc.text(`Generated: ${dStr(new Date())}`,14,28);
+  doc.text(`Weeks included: ${S.customResult.weeksLabel}`,14,20);
+  doc.text(`Generated: ${dStr(new Date())}`,14,25);
   doc.setTextColor(0);
-  let y=38;
-  doc.setFontSize(10);doc.setFont(undefined,'bold');
-  doc.text('Employee',14,y);doc.text('# Placements',110,y);doc.text('Total AWM (USD)',155,y);
+  const marginLeft=14,pageWidth=doc.internal.pageSize.getWidth()-28,colW=pageWidth/header.length;
+  let y=35;
+  doc.setFontSize(9);doc.setFont(undefined,'bold');
+  header.forEach((h,i)=>doc.text(String(h),marginLeft+i*colW,y,{maxWidth:colW-2}));
+  doc.line(marginLeft,y+2,marginLeft+pageWidth,y+2);
   doc.setFont(undefined,'normal');
-  doc.line(14,y+2,196,y+2);
-  y+=8;
-  S.customResult.rows.forEach(r=>{
-    if(y>280){doc.addPage();y=20;}
-    doc.text(String(r.name),14,y);
-    doc.text(String(r.count),110,y);
-    doc.text(`$${fmt(r.awm)}`,155,y);
-    y+=7;
+  y+=7;
+  body.forEach(row=>{
+    if(y>doc.internal.pageSize.getHeight()-15){doc.addPage();y=20;}
+    row.forEach((cell,i)=>doc.text(String(cell),marginLeft+i*colW,y,{maxWidth:colW-2}));
+    y+=6;
   });
   doc.save(`AWM_Custom_Report_${dStr(new Date())}.pdf`);
 }
