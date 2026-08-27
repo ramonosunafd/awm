@@ -393,8 +393,8 @@ tfoot td{background:#f9f9f7;font-weight:600}
       <div>
         <label>Weeks</label>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <select id="crY" style="max-width:110px"></select>
-          <select id="crW" style="max-width:130px"></select>
+          <select id="crY" style="max-width:110px" onchange="fillCRWeekOptions()"></select>
+          <select id="crW" style="max-width:280px"></select>
           <button class="btn btn-secondary btn-sm" onclick="addCRWeek()">+ Add Week</button>
         </div>
         <div class="pill-list" id="crWeeksList"></div>
@@ -1319,6 +1319,17 @@ function openRptDD(key){
 function closeRptDD(){$('rpt-dd').classList.remove('open');}
 
 // ── CUSTOM REPORT BY EMPLOYEE ────────────────────────────────────────────────
+function fillCRWeekOptions(){
+  const y=+($('crY').value||_curYear);
+  const wSel=$('crW');const prevVal=wSel.value;
+  wSel.innerHTML='';
+  for(let w=1;w<=52;w++){
+    const sun=weekStart(y,w);const end=addDays(sun,6);
+    const label=`Week ${w} (${sun.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-US',{month:'short',day:'numeric'})}, ${y})`;
+    const o=document.createElement('option');o.value=w;o.textContent=label;wSel.appendChild(o);
+  }
+  if([...wSel.options].some(o=>o.value===prevVal))wSel.value=prevVal;
+}
 function getCombinedPeopleList(){
   return[...new Set([...S.people.bdm,...S.people.rec,...S.people.adm])].filter(Boolean).sort();
 }
@@ -1365,7 +1376,8 @@ function computeCustomReport(weeks,employees){
       matched.forEach(name=>{acc[name].awm+=contrib;acc[name].placements.add(num);});
     });
   });
-  const rows=employees.map(name=>({name,awm:acc[name].awm,count:acc[name].placements.size})).sort((a,b)=>b.awm-a.awm);
+  const wkCount=weeks.length||1;
+  const rows=employees.map(name=>({name,awm:acc[name].awm/wkCount,count:acc[name].placements.size})).sort((a,b)=>b.awm-a.awm);
   return{rows,missingTdcWeeks};
 }
 function renderCustomReport(){
@@ -1463,6 +1475,7 @@ const _curWeek=Math.max(1,Math.floor((_now-_firstSun)/(7*24*60*60*1000))+1);
 fillYW($('dy'),$('dw'),_curYear,_curWeek);
 fillYW($('fxy'),$('fxw'),_curYear,_curWeek);
 fillYW($('crY'),$('crW'),_curYear,_curWeek);
+fillCRWeekOptions();
 (()=>{const sun=weekStart(_curYear,_curWeek);$('fxrange').textContent=`${fmtD(dStr(sun))} – ${fmtD(dStr(addDays(sun,6)))}`;})();
 </script>
 </body>
