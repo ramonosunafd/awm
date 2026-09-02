@@ -1372,23 +1372,24 @@ function computeCustomReport(weeks,employees){
   const sortedWeeks=[...weeks].sort((a,b)=>a.year!==b.year?a.year-b.year:a.week-b.week);
   const empSet=new Set(employees);
   const acc={};employees.forEach(e=>acc[e]={byWeek:{},placements:new Set()});
-  const allPlacements=new Set();
+  const companyByWeek={};const companyPlacements=new Set();
   const missingTdcWeeks=[];
   sortedWeeks.forEach(({year,week})=>{
     const key=`${year}-W${week}`;
     employees.forEach(e=>{if(acc[e].byWeek[key]===undefined)acc[e].byWeek[key]=0;});
+    companyByWeek[key]=0;
     const exact=getTDCRow(year,week);const tdcRow=exact||getLatestTDCRow();
     if(!exact)missingTdcWeeks.push({year,week,usedRow:tdcRow});
     const workdays=getWorkdays(year,week);
     S.placements.forEach(p=>{
       const activeDays=workdays.filter(d=>isActiveOn(p,d)).length;if(activeDays===0)return;
+      const{margin:m}=calcMargin(p,tdcRow);const contrib=(m*activeDays)/5;
+      const num=p['Num']||p['Consultant Name'];
+      companyByWeek[key]+=contrib;companyPlacements.add(num);
       const roles=[p['BDM'],p['Recruiter'],p['Admin']].filter(Boolean);
       const matched=[...new Set(roles.filter(r=>empSet.has(r)))];
       if(matched.length===0)return;
-      const{margin:m}=calcMargin(p,tdcRow);const contrib=(m*activeDays)/5;
-      const num=p['Num']||p['Consultant Name'];
       matched.forEach(name=>{acc[name].byWeek[key]=(acc[name].byWeek[key]||0)+contrib;acc[name].placements.add(num);});
-      allPlacements.add(num);
     });
   });
   const wkCount=sortedWeeks.length||1;
@@ -1397,9 +1398,9 @@ function computeCustomReport(weeks,employees){
     const sum=byWeek.reduce((s,w)=>s+w.awm,0);
     return{name,byWeek,avg:sum/wkCount,count:acc[name].placements.size};
   }).sort((a,b)=>b.avg-a.avg);
-  const weekTotals=sortedWeeks.map((_,i)=>rows.reduce((s,r)=>s+r.byWeek[i].awm,0));
-  const avgTotal=rows.reduce((s,r)=>s+r.avg,0);
-  return{rows,missingTdcWeeks,weeks:sortedWeeks,weekTotals,avgTotal,distinctPlacementsTotal:allPlacements.size};
+  const companyWeekTotals=sortedWeeks.map(({year,week})=>companyByWeek[`${year}-W${week}`]||0);
+  const companyAvg=companyWeekTotals.reduce((s,v)=>s+v,0)/wkCount;
+  return{rows,missingTdcWeeks,weeks:sortedWeeks,companyWeekTotals,companyAvg,companyPlacementsCount:companyPlacements.size};
 }
 function renderCustomReport(){
   fillCREmpSelect();renderCRWeeksList();renderCREmpList();
@@ -1410,36 +1411,36 @@ function renderCustomReport(){
     ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=true);
     return;
   }
-  const{rows,missingTdcWeeks,weeks,weekTotals,avgTotal,distinctPlacementsTotal}=computeCustomReport(S.customWeeks,S.customEmployees);
+  const{rows,missingTdcWeeks,weeks,companyWeekTotals,companyAvg,companyPlacementsCount}=computeCustomReport(S.customWeeks,S.customEmployees);
   if(missingTdcWeeks.length){
     const items=missingTdcWeeks.map(w=>{const used=w.usedRow?`Week ${w.usedRow['Week']}, ${w.usedRow['Year']} rates`:'no exchange rate data at all — non-USD figures below are unreliable';return`Week ${w.week}, ${w.year} (estimated using ${used})`;}).join('; ');
     $('cr-fxwarn').innerHTML=`<div class="alert-warn">⚠ Missing exchange rates for: ${items}.</div>`;
     $('cr-fxwarn').style.display='block';
   }
   const weeksLabel=weeks.map(w=>`Wk${w.week}/${w.year}`).join(', ');
-  S.customResult={rows,weeks,weeksLabel,weekTotals,avgTotal,distinctPlacementsTotal};
+  S.customResult={rows,weeks,weeksLabel,companyWeekTotals,companyAvg,companyPlacementsCount};
   const weekHeaders=weeks.map(w=>`<th>Wk ${w.week}</th>`).join('');
   const tblRows=rows.map(r=>{
     const weekCells=r.byWeek.map(w=>`<td>${fmtAWM(w.awm)}</td>`).join('');
     return`<tr><td><strong>${r.name}</strong></td>${weekCells}<td style="font-weight:700;border-left:2px solid var(--border)">${fmtAWM(r.avg)}</td><td style="color:var(--muted)">${r.count}</td></tr>`;
   }).join('')||`<tr><td colspan="${weeks.length+3}" style="text-align:center;color:var(--muted);padding:16px">No matching activity for the selected weeks/employees</td></tr>`;
-  const weekTotalCells=weekTotals.map(t=>`<td style="font-weight:700">${fmtAWM(t)}</td>`).join('');
+  const companyWeekCells=companyWeekTotals.map(t=>`<td style="font-weight:700">${fmtAWM(t)}</td>`).join('');
   $('cr-results').innerHTML=`
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Weeks included (sequential): ${weeksLabel}</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Weeks included (sequential): ${weeksLabel}. Note: rows above will double- or triple-count a placement if it's shared across multiple selected people/roles — the highlighted row below is the true, non-duplicated company total.</p>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Employee</th>${weekHeaders}<th style="border-left:2px solid var(--border)">Average</th><th># Placements</th></tr></thead>
       <tbody>${tblRows}</tbody>
-      <tfoot><tr><td style="font-weight:600">Total</td>${weekTotalCells}<td style="font-weight:700;border-left:2px solid var(--border)">${fmtAWM(avgTotal)}</td><td style="color:var(--muted)">${distinctPlacementsTotal}</td></tr></tfoot>
+      <tfoot><tr style="background:#e3f0fb"><td style="font-weight:700">Company Total AWM<div style="font-weight:400;font-size:11px;color:var(--muted)">(all placements, counted once)</div></td>${companyWeekCells}<td style="font-weight:700;border-left:2px solid var(--border)">${fmtAWM(companyAvg)}</td><td style="color:var(--muted)">${companyPlacementsCount}</td></tr></tfoot>
     </table></div>`;
   ['cr-dl-csv','cr-dl-xlsx','cr-dl-pdf'].forEach(id=>$(id).disabled=!rows.length);
 }
 function crExportRows(){
   if(!S.customResult)return null;
-  const{rows,weeks,weekTotals,avgTotal,distinctPlacementsTotal}=S.customResult;
+  const{rows,weeks,companyWeekTotals,companyAvg,companyPlacementsCount}=S.customResult;
   const header=['Employee',...weeks.map(w=>`Wk${w.week}/${w.year}`),'Average AWM (USD)','Distinct Placements'];
   const dataRows=rows.map(r=>[r.name,...r.byWeek.map(w=>Number(w.awm.toFixed(2))),Number(r.avg.toFixed(2)),r.count]);
-  const totalRow=['Total',...weekTotals.map(t=>Number(t.toFixed(2))),Number(avgTotal.toFixed(2)),distinctPlacementsTotal];
-  return[header,...dataRows,totalRow];
+  const companyRow=['Company Total AWM (all placements, counted once)',...companyWeekTotals.map(t=>Number(t.toFixed(2))),Number(companyAvg.toFixed(2)),companyPlacementsCount];
+  return[header,...dataRows,companyRow];
 }
 function csvEscape(v){const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function downloadCRCsv(){
