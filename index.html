@@ -18,9 +18,23 @@
   --t2-bg:#fffde7;--t2-fg:#f9a825;
   --t3-bg:#e8f5ee;--t3-fg:#1a6b3c;
   --t4-bg:#e3f0fb;--t4-fg:#1565c0;
+  /* Decorative-only theme variables. Defaults = the standard look. Seasonal themes override ONLY these
+     (plus --bg/--border/--muted). Data colors (--t1..--t4, --danger, --accent for margins/status) never change. */
+  --ui:#1a6b3c;--ui-hover:#155c32;--ui-text:#1a6b3c;--ui-soft-bg:#e8f5ee;--ui-soft-border:#c3e6d0;
+  --row-hover:#fafaf8;--tfoot-bg:#f9f9f7;
+}
+/* FALL / THANKSGIVING — active automatically Sep 22 – Nov 30 (see theme script in <head>) */
+:root[data-theme="fall"]{
+  --bg:#f8f1e5;--border:#e6d7bd;--muted:#75685a;
+  --ui:#b4561b;--ui-hover:#984713;--ui-text:#984713;--ui-soft-bg:#fbeedc;--ui-soft-border:#efd3ac;
+  --row-hover:#fcf6ec;--tfoot-bg:#f7eedd;
+  --shadow:0 1px 4px rgba(90,60,20,.12);
 }
 body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
-#auth-screen{display:none;position:fixed;inset:0;background:#f5f5f3;z-index:1000;align-items:center;justify-content:center}
+#auth-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;align-items:center;justify-content:center}
+#season-banner{display:none;align-items:center;justify-content:center;gap:10px;padding:6px 16px;font-size:12.5px;font-weight:500;color:#6b3a12;background:linear-gradient(90deg,#f6e3c2,#f0cf9c 50%,#f6e3c2);border-bottom:1px solid #e3c590}
+#season-banner button{background:none;border:none;color:#6b3a12;cursor:pointer;font-size:15px;line-height:1;opacity:.7}
+#season-banner button:hover{opacity:1}
 #auth-screen.active{display:flex}
 .auth-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:48px 40px;text-align:center;max-width:420px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.08)}
 .auth-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px}
@@ -54,11 +68,11 @@ nav button.nav-btn.active{color:var(--brand-red);border-bottom-color:var(--brand
 .form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px}
 label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
 input,select,textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text);background:#fff;outline:none;font-family:inherit}
-input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input:focus,select:focus,textarea:focus{border-color:var(--ui)}
 input:disabled{background:#f5f5f3;color:var(--muted)}
 textarea{resize:vertical;min-height:60px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
-.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#155c32}
+.btn-primary{background:var(--ui);color:#fff}.btn-primary:hover{background:var(--ui-hover)}
 .btn-secondary{background:#fff;color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--bg)}
 .btn-danger{background:#fff;color:var(--danger);border:1px solid #f5c6c2}
 .btn-calc{background:#2e3f50;color:#fff}.btn-calc:hover{background:#1e2d3d}
@@ -68,8 +82,8 @@ textarea{resize:vertical;min-height:60px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:600;font-size:12px;white-space:nowrap}
 td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
-tr:hover td{background:#fafaf8}
-tfoot td{background:#f9f9f7;font-weight:600}
+tr:hover td{background:var(--row-hover)}
+tfoot td{background:var(--tfoot-bg);font-weight:600}
 .dash-tbl td:first-child{font-size:15px;font-weight:600}
 .dash-tbl th{font-size:14px}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)}
@@ -121,11 +135,11 @@ tfoot td{background:#f9f9f7;font-weight:600}
 .calc-value{font-size:18px;font-weight:700;color:#2e3f50}
 .calc-value.margin{font-size:22px;color:var(--accent)}
 .calc-value.neg{color:var(--danger)}
-.alert-info{background:#e8f5ee;color:var(--accent);border:1px solid #c3e6d0;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px}
+.alert-info{background:var(--ui-soft-bg);color:var(--ui-text);border:1px solid var(--ui-soft-border);padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px}
 .alert-warn{background:#fef9e7;color:#8a6000;border:1px solid #f0d060;padding:8px 12px;border-radius:6px;font-size:12px}
 .tabs-inner{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px}
 .tabs-inner button{background:none;border:none;padding:8px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs-inner button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tabs-inner button.active{color:var(--ui-text);border-bottom-color:var(--ui);font-weight:600}
 .section{display:none}.section.active{display:block}
 .pill-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:var(--bg);border:1px solid var(--border);font-size:13px}
@@ -138,7 +152,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
 .adj-row td{background:#fffbf5!important}
 .notes-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px}
 .loading{display:flex;align-items:center;justify-content:center;gap:12px;padding:48px;color:var(--muted)}
-.spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+.spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--ui);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .error-banner{background:#fdecea;color:var(--danger);border:1px solid #f5c6c2;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px}
 #toast{position:fixed;bottom:24px;right:24px;background:#1a1a18;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:999}
@@ -155,6 +169,26 @@ tfoot td{background:#f9f9f7;font-weight:600}
 .pct-wrap input{padding-right:28px}
 .pct-sym{position:absolute;right:8px;font-size:13px;color:var(--muted);pointer-events:none;font-weight:500}
 </style>
+<script>
+/* ── SEASONAL THEME ─────────────────────────────────────────────────────────
+   Automatic by date (browser's local date): Fall = Sep 22 – Nov 30.
+   Testing overrides:  ?theme=fall  (force on)   ?theme=none  (force off)   ?date=2026-11-26 (pretend it's that day)
+   To add another season later (e.g. Christmas), add a :root[data-theme="xmas"] CSS block and one more case in seasonInfo(). */
+function thanksgivingOf(y){var d=new Date(y,10,1);var firstThu=1+((4-d.getDay()+7)%7);return new Date(y,10,firstThu+21);}
+function seasonInfo(now){
+  var q=new URLSearchParams(location.search);
+  var dp=q.get('date');if(dp&&/^\d{4}-\d{2}-\d{2}$/.test(dp)){var a=dp.split('-');now=new Date(+a[0],+a[1]-1,+a[2]);}
+  var y=now.getFullYear();
+  var day=new Date(y,now.getMonth(),now.getDate());
+  var fallStart=new Date(y,8,22),fallEnd=new Date(y,10,30);
+  var theme=(day>=fallStart&&day<=fallEnd)?'fall':'none';
+  var force=q.get('theme');if(force==='fall'||force==='none')theme=force;
+  var tg=thanksgivingOf(y),weekBefore=new Date(tg.getFullYear(),tg.getMonth(),tg.getDate()-6),dayAfter=new Date(tg.getFullYear(),tg.getMonth(),tg.getDate()+1);
+  var thanksgivingWeek=theme==='fall'&&day>=weekBefore&&day<=dayAfter;
+  return{theme:theme,thanksgivingWeek:thanksgivingWeek};
+}
+(function(){var s=seasonInfo(new Date());if(s.theme!=='none')document.documentElement.setAttribute('data-theme',s.theme);})();
+</script>
 </head>
 <body>
 
@@ -196,6 +230,7 @@ tfoot td{background:#f9f9f7;font-weight:600}
   </div>
   <div class="user-chip" id="user-chip"></div>
 </nav>
+<div id="season-banner"><span id="season-banner-text"></span><button type="button" aria-label="Dismiss" onclick="this.parentNode.style.display='none'">×</button></div>
 
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
@@ -1508,6 +1543,12 @@ fillYW($('dy'),$('dw'),_curYear,_curWeek);
 fillYW($('fxy'),$('fxw'),_curYear,_curWeek);
 fillYW($('crY'),$('crW'),_curYear,_curWeek);
 fillCRWeekOptions();
+(function applySeasonBanner(){
+  var info=seasonInfo(new Date());
+  if(info.theme!=='fall')return;
+  document.getElementById('season-banner-text').textContent=info.thanksgivingWeek?'🦃 Happy Thanksgiving to our US team from all of us at Fast Dolphin!':'🍂 Happy fall from Fast Dolphin';
+  document.getElementById('season-banner').style.display='flex';
+})();
 (()=>{const sun=weekStart(_curYear,_curWeek);$('fxrange').textContent=`${fmtD(dStr(sun))} – ${fmtD(dStr(addDays(sun,6)))}`;})();
 </script>
 </body>
